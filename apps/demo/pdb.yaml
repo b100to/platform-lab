@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: demo
+spec:
+  # Survives one zone (2 of 6 replicas) going away.
+  minAvailable: 4
+  selector:
+    matchLabels:
+      app: demo

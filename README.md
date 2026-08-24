@@ -1,51 +1,37 @@
 # platform-lab
 
-A reproducible Kubernetes lab for practising the parts of platform work that are
-hard to rehearse on a production cluster: node failure, recovery, deployment
-safety, and runtime policy.
+Local Kubernetes workshop — a 4-node [kind](https://kind.sigs.k8s.io) cluster
+plus whatever I am currently building or testing against it.
 
-Everything runs locally on a 4-node [kind](https://kind.sigs.k8s.io) cluster
-(1 control-plane, 3 workers labelled as separate zones) so that failure
-scenarios can be triggered on purpose and measured.
+Not a curated portfolio. Things land here when I need somewhere to run them.
 
-## Why
+## Cluster
 
-Cost-optimised clusters run close to the edge: fewer nodes, tighter requests,
-less headroom. That trade-off is only defensible if recovery behaviour is known
-rather than assumed. This lab exists to turn assumptions into measured numbers.
-
-## Quickstart
+1 control-plane + 3 workers. The workers carry `topology.kubernetes.io/zone`
+labels (`zone-a/b/c`) so placement and spread behaviour can be exercised
+without a cloud account.
 
 ```bash
-make up        # create the cluster
-make status    # nodes + pods
-make nodes     # containers backing each node
-
-make kill-node NODE=lab-worker2    # simulate node failure
-make revive-node NODE=lab-worker2  # bring it back
-
-make down      # tear down
+make up                            # create
+make status                        # nodes + pods
+make nodes                         # containers backing each node
+make kill-node NODE=lab-worker2    # stop a node
+make revive-node NODE=lab-worker2  # start it again
+make down                          # tear down
 ```
 
-## Layout
+Host ports **18080 / 18443** map to NodePort 30080 / 30443 on the
+control-plane node (8080/8443 were already taken locally).
+
+## What's here
 
 | Path | What |
 |------|------|
 | `clusters/kind/` | Cluster topology |
-| `platform/` | Platform components (GitOps, policy, security) |
-| `apps/` | Sample workloads used as failure targets |
-| `runbooks/` | Recovery procedures — written before the drill, corrected after |
-| `gamedays/` | Drill records: scenario, timeline, measured recovery, findings |
-
-The runbooks and gameday records are the point. The manifests just make them
-reproducible.
-
-## Roadmap
-
-- [ ] **Failure drills** — node loss, zone loss, pod eviction. Measure recovery, write runbooks
-- [ ] **Deployment safety** — progressive delivery with automated rollback gates
-- [ ] **Policy guardrails** — admission policies enforcing what should never reach a cluster
-- [ ] **Runtime security** — container-runtime detection alongside API-layer auditing
+| `operators/` | Controllers built here |
+| `apps/demo/` | Sample workload to test against |
+| `scripts/probe.sh` | Availability probe — reports error rate and longest outage |
+| `platform/` | Platform components |
 
 ## Conventions
 
