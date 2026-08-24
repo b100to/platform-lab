@@ -22,9 +22,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// labelControlPlane marks nodes that run the control plane. Their static pods
-// cannot be evicted and the node is never a candidate for removal.
-const labelControlPlane = "node-role.kubernetes.io/control-plane"
+const (
+	// labelControlPlane marks nodes that run the control plane. Their static
+	// pods cannot be evicted and the node is never a candidate for removal.
+	labelControlPlane = "node-role.kubernetes.io/control-plane"
+
+	// labelComputeType is set to "fargate" on the synthetic node EKS creates
+	// per Fargate pod. Those are not capacity anyone provisioned or can
+	// reclaim: the node exists because the pod does, and disappears with it.
+	// Counting them makes drainableNodes a fraction that can never be filled,
+	// because the pod holding the node is the reason the node is there.
+	//
+	// This matters more than it sounds: running the controller itself on
+	// Fargate is a common way to avoid depending on the EC2 capacity it is
+	// trying to reclaim.
+	labelComputeType = "eks.amazonaws.com/compute-type"
+)
 
 // nodeCensus is what one pass over the cluster's nodes found.
 type nodeCensus struct {
@@ -70,6 +83,9 @@ func (r *IdleWindowReconciler) countDrainableNodes(ctx context.Context) (nodeCen
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		if _, isControlPlane := node.Labels[labelControlPlane]; isControlPlane {
+			continue
+		}
+		if node.Labels[labelComputeType] == "fargate" {
 			continue
 		}
 		census.workers++

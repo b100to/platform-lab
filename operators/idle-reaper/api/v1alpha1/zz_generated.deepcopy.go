@@ -98,11 +98,6 @@ func (in *IdleWindowSpec) DeepCopyInto(out *IdleWindowSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.SkipIfHPA != nil {
-		in, out := &in.SkipIfHPA, &out.SkipIfHPA
-		*out = new(bool)
-		**out = **in
-	}
 	if in.RespectManualScale != nil {
 		in, out := &in.RespectManualScale, &out.RespectManualScale
 		*out = new(bool)

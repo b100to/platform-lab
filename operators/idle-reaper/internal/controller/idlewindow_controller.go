@@ -19,11 +19,13 @@ package controller
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,6 +60,7 @@ type IdleWindowReconciler struct {
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // tally accumulates what one pass over the selected workloads did.
@@ -65,6 +68,10 @@ type tally struct {
 	affected  int32
 	skipped   int32
 	reclaimed corev1.ResourceList
+
+	// blockers names what kept a workload from shrinking, so the reason can
+	// reach conditions and Events rather than vanishing into a counter.
+	blockers []string
 }
 
 // Reconcile drives the selected workloads toward the state the schedule
@@ -139,6 +146,11 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	blockingPDBs, pdbNames, err := r.pdbsBlockingDrain(ctx, window.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	next := metav1.NewTime(state.next)
 	window.Status.Phase = phase
 	window.Status.AffectedWorkloads = t.affected
@@ -146,10 +158,12 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	window.Status.Reclaimed = t.reclaimed
 	window.Status.DrainableNodes = census.drainable
 	window.Status.WorkerNodes = census.workers
+	window.Status.BlockingPDBs = blockingPDBs
 	window.Status.NextTransitionTime = &next
 	window.Status.ObservedGeneration = window.Generation
 	r.setReady(&window, metav1.ConditionTrue, "Reconciled",
 		"selected "+strconv.Itoa(len(targets))+" deployments")
+	r.setUnblocked(&window, t.blockers, pdbNames)
 
 	if err := r.writeStatus(ctx, &window); err != nil {
 		return ctrl.Result{}, err
@@ -206,8 +220,13 @@ func (r *IdleWindowReconciler) reconcileDeployment(
 	hpaOwned map[string]bool,
 	t *tally,
 ) error {
-	if ptrBool(w.Spec.SkipIfHPA) && hpaOwned[dep.Name] {
+	if hpaOwned[dep.Name] && w.Spec.HPAPolicy != finopsv1alpha1.HPAPolicyScale {
 		t.skipped++
+		if w.Spec.HPAPolicy == finopsv1alpha1.HPAPolicyWarn {
+			t.blockers = append(t.blockers, dep.Name+" (HPA)")
+			r.event(w, corev1.EventTypeWarning, "NotReclaimed",
+				"deployment "+dep.Name+" is scaled by a HorizontalPodAutoscaler and was left alone")
+		}
 		return nil
 	}
 
@@ -351,6 +370,63 @@ func (r *IdleWindowReconciler) writeStatus(ctx context.Context, w *finopsv1alpha
 	// A conflict means someone else wrote first; the next reconcile reads the
 	// fresh object and recomputes. Nothing is lost by dropping this write.
 	return client.IgnoreNotFound(ignoreConflict(err))
+}
+
+// pdbsBlockingDrain finds PodDisruptionBudgets that currently permit no
+// disruption at all.
+//
+// A PDB never stops this controller from writing a replica count — it stops an
+// eviction. That matters anyway: a node cannot be removed while a pod on it
+// refuses to be evicted, and node removal is the part that saves money. The
+// common shape is one replica with minAvailable one, which allows zero
+// disruptions forever.
+//
+// status.disruptionsAllowed is read rather than inferred from the spec because
+// it is the number the eviction API actually enforces.
+func (r *IdleWindowReconciler) pdbsBlockingDrain(ctx context.Context, ns string) (int32, []string, error) {
+	var list policyv1.PodDisruptionBudgetList
+	if err := r.List(ctx, &list, client.InNamespace(ns)); err != nil {
+		return 0, nil, err
+	}
+
+	var count int32
+	var names []string
+	for i := range list.Items {
+		pdb := &list.Items[i]
+		// A budget that currently guards no pods blocks nothing, however
+		// strict it looks. Once the workload is already at zero, the same
+		// disruptionsAllowed of zero means "nothing to disrupt" rather than
+		// "refuses disruption", and reporting it would be a false alarm
+		// appearing exactly when the reclaim succeeded.
+		if pdb.Status.DisruptionsAllowed == 0 && pdb.Status.CurrentHealthy > 0 {
+			count++
+			names = append(names, pdb.Name+" (PDB)")
+		}
+	}
+	return count, names, nil
+}
+
+// setUnblocked states whether anything is standing between this namespace and
+// a fully reclaimed one.
+func (r *IdleWindowReconciler) setUnblocked(w *finopsv1alpha1.IdleWindow, workloadBlockers, pdbBlockers []string) {
+	all := append(append([]string{}, workloadBlockers...), pdbBlockers...)
+	if len(all) == 0 {
+		meta.SetStatusCondition(&w.Status.Conditions, metav1.Condition{
+			Type:               finopsv1alpha1.ConditionUnblocked,
+			Status:             metav1.ConditionTrue,
+			Reason:             "NothingBlocking",
+			Message:            "no workload or PodDisruptionBudget prevents reclaiming this namespace",
+			ObservedGeneration: w.Generation,
+		})
+		return
+	}
+	meta.SetStatusCondition(&w.Status.Conditions, metav1.Condition{
+		Type:               finopsv1alpha1.ConditionUnblocked,
+		Status:             metav1.ConditionFalse,
+		Reason:             "ReclaimBlocked",
+		Message:            "not fully reclaimable: " + strings.Join(all, ", "),
+		ObservedGeneration: w.Generation,
+	})
 }
 
 func (r *IdleWindowReconciler) setReady(w *finopsv1alpha1.IdleWindow, status metav1.ConditionStatus, reason, msg string) {

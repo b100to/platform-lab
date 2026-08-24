@@ -56,6 +56,20 @@ const (
 	// ConditionReady is false when the schedule cannot be parsed or the
 	// controller cannot act on the selected workloads.
 	ConditionReady = "Ready"
+
+	// ConditionUnblocked is false when something stops the namespace from
+	// being fully reclaimed: a workload this controller will not scale, or a
+	// PodDisruptionBudget that will not let a node be drained. Reclaiming
+	// nothing and reclaiming everything both look like success in a bare
+	// counter; this is where the difference is stated.
+	ConditionUnblocked = "Unblocked"
+)
+
+// HPA policy values.
+const (
+	HPAPolicySkip  = "Skip"
+	HPAPolicyWarn  = "Warn"
+	HPAPolicyScale = "Scale"
 )
 
 // IdleWindowSpec declares when a set of workloads is considered idle.
@@ -97,12 +111,25 @@ type IdleWindowSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	MinReplicas *int32 `json:"minReplicas,omitempty"`
 
-	// skipIfHPA leaves workloads with a HorizontalPodAutoscaler untouched.
-	// Two controllers writing the same replica field oscillate, so v1alpha1
-	// avoids the conflict instead of resolving it (D4).
+	// hpaPolicy decides what to do with a workload whose replica count is
+	// already owned by a HorizontalPodAutoscaler.
+	//
+	//	Skip  - leave it alone, quietly
+	//	Warn  - leave it alone and say so, in an Event and in conditions
+	//	Scale - treat it like any other workload
+	//
+	// Warn is the default because silence is the wrong answer here: a
+	// workload that never shrinks is exactly what someone reading this object
+	// needs to know about, and a dev-environment HPA that pins replicas is
+	// usually a mistake worth surfacing rather than absorbing.
+	//
+	// Scale exists for the case where the HPA is known to be dormant, and is
+	// deliberately not the default: two controllers writing the same field
+	// will fight.
 	// +optional
-	// +kubebuilder:default=true
-	SkipIfHPA *bool `json:"skipIfHPA,omitempty"`
+	// +kubebuilder:default=Warn
+	// +kubebuilder:validation:Enum=Skip;Warn;Scale
+	HPAPolicy string `json:"hpaPolicy,omitempty"`
 
 	// respectManualScale leaves a workload alone for the remainder of the
 	// current window if someone changed its replica count by hand. Automation
@@ -141,6 +168,13 @@ type IdleWindowStatus struct {
 	// controller looks like it silently did nothing.
 	// +optional
 	SkippedWorkloads int32 `json:"skippedWorkloads"`
+
+	// blockingPDBs counts PodDisruptionBudgets in this namespace that
+	// currently allow no disruption at all. Those do not stop this controller
+	// from changing replica counts, but they do stop a node from being
+	// drained, which is where the saving actually comes from.
+	// +optional
+	BlockingPDBs int32 `json:"blockingPDBs"`
 
 	// drainableNodes counts worker nodes whose only remaining pods are managed
 	// by DaemonSets. Those nodes are the ones a node autoscaler can actually

@@ -66,6 +66,24 @@ spec:
           spec:
             description: spec defines the desired state of IdleWindow
             properties:
+              hpaPolicy:
+                default: Warn
+                description: "hpaPolicy decides what to do with a workload whose replica
+                  count is\nalready owned by a HorizontalPodAutoscaler.\n\n\tSkip
+                  \ - leave it alone, quietly\n\tWarn  - leave it alone and say so,
+                  in an Event and in conditions\n\tScale - treat it like any other
+                  workload\n\nWarn is the default because silence is the wrong answer
+                  here: a\nworkload that never shrinks is exactly what someone reading
+                  this object\nneeds to know about, and a dev-environment HPA that
+                  pins replicas is\nusually a mistake worth surfacing rather than
+                  absorbing.\n\nScale exists for the case where the HPA is known to
+                  be dormant, and is\ndeliberately not the default: two controllers
+                  writing the same field\nwill fight."
+                enum:
+                - Skip
+                - Warn
+                - Scale
+                type: string
               minReplicas:
                 default: 0
                 description: |-
@@ -132,13 +150,6 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-              skipIfHPA:
-                default: true
-                description: |-
-                  skipIfHPA leaves workloads with a HorizontalPodAutoscaler untouched.
-                  Two controllers writing the same replica field oscillate, so v1alpha1
-                  avoids the conflict instead of resolving it (D4).
-                type: boolean
               sleepAt:
                 description: |-
                   sleepAt is a five-field cron expression marking the start of the idle
@@ -175,6 +186,14 @@ spec:
                 description: |-
                   affectedWorkloads counts the Deployments this window currently holds
                   scaled down.
+                format: int32
+                type: integer
+              blockingPDBs:
+                description: |-
+                  blockingPDBs counts PodDisruptionBudgets in this namespace that
+                  currently allow no disruption at all. Those do not stop this controller
+                  from changing replica counts, but they do stop a node from being
+                  drained, which is where the saving actually comes from.
                 format: int32
                 type: integer
               conditions:
