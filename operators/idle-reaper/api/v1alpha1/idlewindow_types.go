@@ -17,42 +17,144 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// Annotations written onto the workloads this controller scales.
+//
+// The original replica count lives on the workload rather than in IdleWindow
+// status on purpose: deleting the IdleWindow, or losing the controller, must
+// not strand a workload at zero with no record of where it came from.
+// See DESIGN.md, decision D1.
+const (
+	// AnnotationSavedReplicas holds the replica count observed before the
+	// first scale-down. It is the value restored on wake.
+	AnnotationSavedReplicas = "finops.b100to.dev/saved-replicas"
 
-// IdleWindowSpec defines the desired state of IdleWindow
+	// AnnotationAppliedReplicas holds the replica count this controller last
+	// wrote. A workload whose current replicas differ from this was changed by
+	// someone else, which is how manual intervention is detected (D3).
+	AnnotationAppliedReplicas = "finops.b100to.dev/applied-replicas"
+
+	// AnnotationOwnedBy names the IdleWindow responsible for a workload, so two
+	// overlapping selectors do not silently fight over the same Deployment.
+	AnnotationOwnedBy = "finops.b100to.dev/owned-by"
+)
+
+// Phase values reported in IdleWindowStatus.
+const (
+	// PhaseAwake means the current time is outside the idle window.
+	PhaseAwake = "Awake"
+	// PhaseAsleep means the current time is inside the idle window.
+	PhaseAsleep = "Asleep"
+)
+
+// Condition types reported in IdleWindowStatus.
+const (
+	// ConditionReady is false when the schedule cannot be parsed or the
+	// controller cannot act on the selected workloads.
+	ConditionReady = "Ready"
+)
+
+// IdleWindowSpec declares when a set of workloads is considered idle.
+//
+// It describes a recurring window, not an action. The controller compares the
+// current time against this declaration on every reconcile, so a missed event
+// or a controller restart cannot leave workloads in the wrong state.
 type IdleWindowSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
+	// selector chooses the Deployments in this namespace that the window
+	// applies to. An empty selector matches nothing rather than everything —
+	// scaling every workload in a namespace should never be the accidental
+	// default.
+	// +required
+	Selector metav1.LabelSelector `json:"selector"`
 
-	// foo is an example field of IdleWindow. Edit idlewindow_types.go to remove/update
+	// sleepAt is a five-field cron expression marking the start of the idle
+	// window, evaluated in timezone.
+	// +required
+	// +kubebuilder:validation:MinLength=9
+	SleepAt string `json:"sleepAt"`
+
+	// wakeAt is a five-field cron expression marking the end of the idle
+	// window, evaluated in timezone.
+	// +required
+	// +kubebuilder:validation:MinLength=9
+	WakeAt string `json:"wakeAt"`
+
+	// timezone is an IANA location name used to evaluate sleepAt and wakeAt.
+	// Schedules are written by people in a specific place; pinning to UTC
+	// silently shifts the window twice a year for locations with DST.
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	// +kubebuilder:default="Asia/Seoul"
+	Timezone string `json:"timezone,omitempty"`
+
+	// minReplicas is the replica count applied during the idle window.
+	// Zero reclaims the most, but some workloads must stay reachable.
+	// +optional
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+
+	// skipIfHPA leaves workloads with a HorizontalPodAutoscaler untouched.
+	// Two controllers writing the same replica field oscillate, so v1alpha1
+	// avoids the conflict instead of resolving it (D4).
+	// +optional
+	// +kubebuilder:default=true
+	SkipIfHPA *bool `json:"skipIfHPA,omitempty"`
+
+	// respectManualScale leaves a workload alone for the remainder of the
+	// current window if someone changed its replica count by hand. Automation
+	// overriding a person who scaled up in a hurry is an incident, not a
+	// correction (D3).
+	// +optional
+	// +kubebuilder:default=true
+	RespectManualScale *bool `json:"respectManualScale,omitempty"`
+
+	// suspend stops the controller from acting without deleting the object,
+	// so a window can be disabled during an incident and restored afterwards.
+	// +optional
+	// +kubebuilder:default=false
+	Suspend *bool `json:"suspend,omitempty"`
 }
 
-// IdleWindowStatus defines the observed state of IdleWindow.
+// IdleWindowStatus reports what the controller observed and did.
 type IdleWindowStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// phase is Awake or Asleep, derived from the current time.
+	// +optional
+	Phase string `json:"phase,omitempty"`
 
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+	// reclaimed is the sum of resource requests currently not scheduled
+	// because of this window. This is a measurement, not a cost estimate —
+	// converting it to money requires pricing the controller does not have.
+	// +optional
+	Reclaimed corev1.ResourceList `json:"reclaimed,omitempty"`
+
+	// affectedWorkloads counts the Deployments this window currently holds
+	// scaled down.
+	// +optional
+	AffectedWorkloads int32 `json:"affectedWorkloads,omitempty"`
+
+	// skippedWorkloads counts selected Deployments deliberately left alone —
+	// an attached HPA, or a manual scale being respected. Without this the
+	// controller looks like it silently did nothing.
+	// +optional
+	SkippedWorkloads int32 `json:"skippedWorkloads,omitempty"`
+
+	// nextTransitionTime is when the phase is expected to change. It doubles
+	// as a check that the schedule was parsed the way the author intended.
+	// +optional
+	NextTransitionTime *metav1.Time `json:"nextTransitionTime,omitempty"`
+
+	// lastTransitionTime is when the phase last changed.
+	// +optional
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+
+	// observedGeneration is the spec generation this status reflects.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// conditions represent the current state of the IdleWindow resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
 	// +listType=map
 	// +listMapKey=type
 	// +optional
@@ -61,6 +163,13 @@ type IdleWindowStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=iw
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Scaled",type=integer,JSONPath=`.status.affectedWorkloads`
+// +kubebuilder:printcolumn:name="Skipped",type=integer,JSONPath=`.status.skippedWorkloads`
+// +kubebuilder:printcolumn:name="CPU",type=string,JSONPath=`.status.reclaimed.cpu`
+// +kubebuilder:printcolumn:name="Next",type=string,JSONPath=`.status.nextTransitionTime`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // IdleWindow is the Schema for the idlewindows API
 type IdleWindow struct {
@@ -89,8 +198,5 @@ type IdleWindowList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(func(s *runtime.Scheme) error {
-		s.AddKnownTypes(SchemeGroupVersion, &IdleWindow{}, &IdleWindowList{})
-		return nil
-	})
+	SchemeBuilder.Register(&IdleWindow{}, &IdleWindowList{})
 }

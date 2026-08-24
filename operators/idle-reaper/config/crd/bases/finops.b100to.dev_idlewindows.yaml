@@ -11,10 +11,31 @@ spec:
     kind: IdleWindow
     listKind: IdleWindowList
     plural: idlewindows
+    shortNames:
+    - iw
     singular: idlewindow
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.affectedWorkloads
+      name: Scaled
+      type: integer
+    - jsonPath: .status.skippedWorkloads
+      name: Skipped
+      type: integer
+    - jsonPath: .status.reclaimed.cpu
+      name: CPU
+      type: string
+    - jsonPath: .status.nextTransitionTime
+      name: Next
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: IdleWindow is the Schema for the idlewindows API
@@ -39,25 +60,121 @@ spec:
           spec:
             description: spec defines the desired state of IdleWindow
             properties:
-              foo:
-                description: foo is an example field of IdleWindow. Edit idlewindow_types.go
-                  to remove/update
+              minReplicas:
+                default: 0
+                description: |-
+                  minReplicas is the replica count applied during the idle window.
+                  Zero reclaims the most, but some workloads must stay reachable.
+                format: int32
+                minimum: 0
+                type: integer
+              respectManualScale:
+                default: true
+                description: |-
+                  respectManualScale leaves a workload alone for the remainder of the
+                  current window if someone changed its replica count by hand. Automation
+                  overriding a person who scaled up in a hurry is an incident, not a
+                  correction (D3).
+                type: boolean
+              selector:
+                description: |-
+                  selector chooses the Deployments in this namespace that the window
+                  applies to. An empty selector matches nothing rather than everything —
+                  scaling every workload in a namespace should never be the accidental
+                  default.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              skipIfHPA:
+                default: true
+                description: |-
+                  skipIfHPA leaves workloads with a HorizontalPodAutoscaler untouched.
+                  Two controllers writing the same replica field oscillate, so v1alpha1
+                  avoids the conflict instead of resolving it (D4).
+                type: boolean
+              sleepAt:
+                description: |-
+                  sleepAt is a five-field cron expression marking the start of the idle
+                  window, evaluated in timezone.
+                minLength: 9
                 type: string
+              suspend:
+                default: false
+                description: |-
+                  suspend stops the controller from acting without deleting the object,
+                  so a window can be disabled during an incident and restored afterwards.
+                type: boolean
+              timezone:
+                default: Asia/Seoul
+                description: |-
+                  timezone is an IANA location name used to evaluate sleepAt and wakeAt.
+                  Schedules are written by people in a specific place; pinning to UTC
+                  silently shifts the window twice a year for locations with DST.
+                type: string
+              wakeAt:
+                description: |-
+                  wakeAt is a five-field cron expression marking the end of the idle
+                  window, evaluated in timezone.
+                minLength: 9
+                type: string
+            required:
+            - selector
+            - sleepAt
+            - wakeAt
             type: object
           status:
             description: status defines the observed state of IdleWindow
             properties:
-              conditions:
+              affectedWorkloads:
                 description: |-
-                  conditions represent the current state of the IdleWindow resource.
-                  Each condition has a unique type and reflects the status of a specific aspect of the resource.
-
-                  Standard condition types include:
-                  - "Available": the resource is fully functional
-                  - "Progressing": the resource is being created or updated
-                  - "Degraded": the resource failed to reach or maintain its desired state
-
-                  The status of each condition is one of True, False, or Unknown.
+                  affectedWorkloads counts the Deployments this window currently holds
+                  scaled down.
+                format: int32
+                type: integer
+              conditions:
+                description: conditions represent the current state of the IdleWindow
+                  resource.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -116,6 +233,43 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              lastTransitionTime:
+                description: lastTransitionTime is when the phase last changed.
+                format: date-time
+                type: string
+              nextTransitionTime:
+                description: |-
+                  nextTransitionTime is when the phase is expected to change. It doubles
+                  as a check that the schedule was parsed the way the author intended.
+                format: date-time
+                type: string
+              observedGeneration:
+                description: observedGeneration is the spec generation this status
+                  reflects.
+                format: int64
+                type: integer
+              phase:
+                description: phase is Awake or Asleep, derived from the current time.
+                type: string
+              reclaimed:
+                additionalProperties:
+                  anyOf:
+                  - type: integer
+                  - type: string
+                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                  x-kubernetes-int-or-string: true
+                description: |-
+                  reclaimed is the sum of resource requests currently not scheduled
+                  because of this window. This is a measurement, not a cost estimate —
+                  converting it to money requires pricing the controller does not have.
+                type: object
+              skippedWorkloads:
+                description: |-
+                  skippedWorkloads counts selected Deployments deliberately left alone —
+                  an attached HPA, or a manual scale being respected. Without this the
+                  controller looks like it silently did nothing.
+                format: int32
+                type: integer
             type: object
         required:
         - spec

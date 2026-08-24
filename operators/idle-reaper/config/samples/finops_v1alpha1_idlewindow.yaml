@@ -3,7 +3,16 @@ kind: IdleWindow
 metadata:
   labels:
     app.kubernetes.io/name: idle-reaper
-    app.kubernetes.io/managed-by: kustomize
-  name: idlewindow-sample
+  name: dev-nights
 spec:
-  # TODO(user): Add fields here
+  # Matches the demo workload in ../../../apps/demo
+  selector:
+    matchLabels:
+      app: demo
+  # Weeknights 20:00 -> 09:00, Asia/Seoul
+  sleepAt: "0 20 * * 1-5"
+  wakeAt: "0 9 * * 1-5"
+  timezone: Asia/Seoul
+  minReplicas: 0
+  skipIfHPA: true
+  respectManualScale: true
