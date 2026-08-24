@@ -86,9 +86,13 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	var window finopsv1alpha1.IdleWindow
 	if err := r.Get(ctx, req.NamespacedName, &window); err != nil {
-		// Deleted between the event and this read. Workloads keep their
-		// annotations, so their original size is still recoverable by hand.
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if errors.IsNotFound(err) {
+			// Deleted between the event and this read. Workloads keep their
+			// annotations, so their original size is still recoverable by hand.
+			forgetMetrics(req.Namespace, req.Name)
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
 	}
 
 	if ptrBool(window.Spec.Suspend) {
@@ -168,6 +172,7 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.writeStatus(ctx, &window); err != nil {
 		return ctrl.Result{}, err
 	}
+	publishMetrics(&window, census)
 	return ctrl.Result{RequeueAfter: requeueAfter(r.now(), state.next)}, nil
 }
 
@@ -224,8 +229,6 @@ func (r *IdleWindowReconciler) reconcileDeployment(
 		t.skipped++
 		if w.Spec.HPAPolicy == finopsv1alpha1.HPAPolicyWarn {
 			t.blockers = append(t.blockers, dep.Name+" (HPA)")
-			r.event(w, corev1.EventTypeWarning, "NotReclaimed",
-				"deployment "+dep.Name+" is scaled by a HorizontalPodAutoscaler and was left alone")
 		}
 		return nil
 	}
@@ -407,26 +410,43 @@ func (r *IdleWindowReconciler) pdbsBlockingDrain(ctx context.Context, ns string)
 }
 
 // setUnblocked states whether anything is standing between this namespace and
-// a fully reclaimed one.
+// a fully reclaimed one, and emits an Event only when that answer changes.
+//
+// Conditions and Events answer different questions. A condition is the current
+// state and is expected to be rewritten every pass; an Event is a thing that
+// happened. Emitting the same warning on every reconcile turns a fact into
+// noise — a blocker present for a week would produce thousands of Events
+// saying nothing new.
 func (r *IdleWindowReconciler) setUnblocked(w *finopsv1alpha1.IdleWindow, workloadBlockers, pdbBlockers []string) {
 	all := append(append([]string{}, workloadBlockers...), pdbBlockers...)
-	if len(all) == 0 {
-		meta.SetStatusCondition(&w.Status.Conditions, metav1.Condition{
-			Type:               finopsv1alpha1.ConditionUnblocked,
-			Status:             metav1.ConditionTrue,
-			Reason:             "NothingBlocking",
-			Message:            "no workload or PodDisruptionBudget prevents reclaiming this namespace",
-			ObservedGeneration: w.Generation,
-		})
+
+	next := metav1.Condition{
+		Type:               finopsv1alpha1.ConditionUnblocked,
+		Status:             metav1.ConditionTrue,
+		Reason:             "NothingBlocking",
+		Message:            "no workload or PodDisruptionBudget prevents reclaiming this namespace",
+		ObservedGeneration: w.Generation,
+	}
+	if len(all) > 0 {
+		next.Status = metav1.ConditionFalse
+		next.Reason = "ReclaimBlocked"
+		next.Message = "not fully reclaimable: " + strings.Join(all, ", ")
+	}
+
+	// Compare against the message too: the set of blockers can change while
+	// the condition stays False, and that change is worth an Event.
+	previous := meta.FindStatusCondition(w.Status.Conditions, finopsv1alpha1.ConditionUnblocked)
+	unchanged := previous != nil && previous.Status == next.Status && previous.Message == next.Message
+
+	meta.SetStatusCondition(&w.Status.Conditions, next)
+	if unchanged {
 		return
 	}
-	meta.SetStatusCondition(&w.Status.Conditions, metav1.Condition{
-		Type:               finopsv1alpha1.ConditionUnblocked,
-		Status:             metav1.ConditionFalse,
-		Reason:             "ReclaimBlocked",
-		Message:            "not fully reclaimable: " + strings.Join(all, ", "),
-		ObservedGeneration: w.Generation,
-	})
+	if next.Status == metav1.ConditionTrue {
+		r.event(w, corev1.EventTypeNormal, "Unblocked", next.Message)
+		return
+	}
+	r.event(w, corev1.EventTypeWarning, "ReclaimBlocked", next.Message)
 }
 
 func (r *IdleWindowReconciler) setReady(w *finopsv1alpha1.IdleWindow, status metav1.ConditionStatus, reason, msg string) {
