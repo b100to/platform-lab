@@ -253,6 +253,12 @@ func (r *IdleWindowReconciler) reconcileDeployment(
 	manuallyChanged := hasApplied && current != applied
 	if manuallyChanged && ptrBool(w.Spec.RespectManualScale) {
 		t.skipped++
+		if state.asleep {
+			// Worth naming even though it is intentional and temporary: it is
+			// the difference between "the window is not saving anything" and
+			// "the window is broken", and a counter alone cannot say which.
+			t.blockers = append(t.blockers, dep.Name+" (manual)")
+		}
 		if !state.asleep {
 			// The window is over and the value is theirs now. Drop the
 			// bookkeeping so the next sleep starts from what they chose.
