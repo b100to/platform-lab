@@ -126,3 +126,17 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { memory: 64Mi }
+---
+# The classic trap: one replica, minAvailable one. status.disruptionsAllowed
+# stays at zero forever, so the pod can never be evicted and the node it sits
+# on can never be drained. Harmless-looking, and a common reason a dev cluster
+# refuses to shrink.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cache
+  namespace: lab-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: demo, tier: cache }
