@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- finops_v1alpha1_idlewindow.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
