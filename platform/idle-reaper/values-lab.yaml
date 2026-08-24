@@ -1,0 +1,40 @@
+# Values for installing idle-reaper into this lab cluster.
+#
+# The chart itself stays generic; everything specific to this cluster — the
+# locally built image, the node roles, plain-HTTP metrics — lives here.
+
+manager:
+  image:
+    repository: idle-reaper
+    tag: dev
+    # Nothing pushes this image anywhere; it is loaded straight into the kind
+    # nodes, so pulling would fail.
+    pullPolicy: IfNotPresent
+
+  args:
+    - --leader-elect
+    # Only the app nodes are capacity this operator may report as reclaimable.
+    # Without this the infra node is counted and drainableNodes never reaches
+    # its denominator.
+    - --reclaimable-node-selector=platform-lab.dev/role=app
+
+  # An operator that empties nodes must not run on a node it empties. If it
+  # did, scaling the app nodes to zero would take the controller with them and
+  # nothing would be left to wake anything up.
+  nodeSelector:
+    platform-lab.dev/role: infra
+  tolerations:
+    - key: dedicated
+      value: infra
+      effect: NoSchedule
+
+metrics:
+  enabled: true
+  # Plain HTTP: the authn/authz path needs a TokenReview-capable client and
+  # certificates that this lab has no way to issue.
+  secure: false
+  port: 8443
+
+crd:
+  enabled: true
+  keep: true

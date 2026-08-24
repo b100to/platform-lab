@@ -6,6 +6,10 @@ cliVersion: 4.15.0
 domain: b100to.dev
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  helm.kubebuilder.io/v2-alpha:
+    manifests: dist/install.yaml
+    output: dist
 projectName: idle-reaper
 repo: github.com/b100to/platform-lab/operators/idle-reaper
 resources:

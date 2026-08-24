@@ -7,9 +7,12 @@ WINDOW   ?= dev-nights
 OPERATOR ?= operators/idle-reaper
 METRICS  ?= 18090
 HEALTH   ?= 18091
+IMG      ?= idle-reaper:dev
+OPERATOR_NS ?= idle-reaper-system
 
 .PHONY: help up down status nodes kill-node revive-node scan \
-        lab-install lab-run lab-sleep lab-wake lab-status lab-metrics lab-reset
+        lab-install lab-run lab-sleep lab-wake lab-status lab-metrics lab-reset \
+        lab-image lab-deploy lab-undeploy
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -97,6 +100,19 @@ lab-status: ## Show the window, the workloads, and what holds each node
 lab-metrics: ## Scrape the controller's own metrics
 	@curl -s --max-time 5 http://localhost:$(METRICS)/metrics | grep -E '^idlereaper' | sort \
 		|| echo "no metrics -- is 'make lab-run' running?"
+
+lab-image: ## Build the controller image and load it into the kind nodes
+	cd $(OPERATOR) && docker build -t $(IMG) .
+	kind load docker-image $(IMG) --name $(CLUSTER)
+
+lab-deploy: lab-image ## Install the operator into the cluster with Helm
+	helm upgrade --install idle-reaper $(OPERATOR)/dist/chart \
+		-n $(OPERATOR_NS) --create-namespace \
+		-f platform/idle-reaper/values-lab.yaml
+	kubectl rollout status -n $(OPERATOR_NS) deploy/idle-reaper-controller-manager --timeout=120s
+
+lab-undeploy: ## Remove the operator (the CRD is kept)
+	-helm uninstall idle-reaper -n $(OPERATOR_NS)
 
 lab-reset: ## Delete the window and put every workload back
 	-kubectl delete idlewindow --all -n $(NS) --ignore-not-found

@@ -4,25 +4,32 @@ ARG TARGETOS
 ARG TARGETARCH
 
 WORKDIR /workspace
-# Copy the Go Modules manifests
+
+# Dependencies first so a source-only change does not re-download them.
 COPY go.mod go.mod
 COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-# Copy the Go source (relies on .dockerignore to filter)
-COPY . .
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
 
-# Build
-# the GOARCH has no default value to allow the binary to be built according to the host where the command
-# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
-# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
-# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+# The scaffolded build passed -a, which forces every package including the
+# standard library to be rebuilt from scratch. For a controller-runtime binary
+# that turns a build into a fifteen-minute wait for no benefit: CGO_ENABLED=0
+# already gives a static binary, and the build cache handles correctness.
+#
+# The cache mounts keep the module and build caches across image builds, which
+# is what makes an incremental rebuild take seconds instead of minutes.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o manager cmd/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# Distroless: no shell, no package manager, non-root by default.
+# Note the binary embeds the timezone database (time/tzdata) because this image
+# has no system zoneinfo and schedules are evaluated in a named location.
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .

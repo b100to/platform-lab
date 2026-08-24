@@ -1,0 +1,687 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+    control-plane: controller-manager
+  name: idle-reaper-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: idlewindows.finops.b100to.dev
+spec:
+  group: finops.b100to.dev
+  names:
+    kind: IdleWindow
+    listKind: IdleWindowList
+    plural: idlewindows
+    shortNames:
+    - iw
+    singular: idlewindow
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.affectedWorkloads
+      name: Scaled
+      type: integer
+    - jsonPath: .status.skippedWorkloads
+      name: Skipped
+      type: integer
+    - jsonPath: .status.reclaimed.cpu
+      name: CPU
+      type: string
+    - jsonPath: .status.drainableNodes
+      name: Drainable
+      type: string
+    - jsonPath: .status.workerNodes
+      name: Nodes
+      type: string
+    - jsonPath: .status.nextTransitionTime
+      name: Next
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: IdleWindow is the Schema for the idlewindows API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of IdleWindow
+            properties:
+              hpaPolicy:
+                default: Warn
+                description: "hpaPolicy decides what to do with a workload whose replica
+                  count is\nalready owned by a HorizontalPodAutoscaler.\n\n\tSkip
+                  \ - leave it alone, quietly\n\tWarn  - leave it alone and say so,
+                  in an Event and in conditions\n\tScale - treat it like any other
+                  workload\n\nWarn is the default because silence is the wrong answer
+                  here: a\nworkload that never shrinks is exactly what someone reading
+                  this object\nneeds to know about, and a dev-environment HPA that
+                  pins replicas is\nusually a mistake worth surfacing rather than
+                  absorbing.\n\nScale exists for the case where the HPA is known to
+                  be dormant, and is\ndeliberately not the default: two controllers
+                  writing the same field\nwill fight."
+                enum:
+                - Skip
+                - Warn
+                - Scale
+                type: string
+              minReplicas:
+                default: 0
+                description: |-
+                  minReplicas is the replica count applied during the idle window.
+                  Zero reclaims the most, but some workloads must stay reachable.
+                format: int32
+                minimum: 0
+                type: integer
+              respectManualScale:
+                default: true
+                description: |-
+                  respectManualScale leaves a workload alone for the remainder of the
+                  current window if someone changed its replica count by hand. Automation
+                  overriding a person who scaled up in a hurry is an incident, not a
+                  correction (D3).
+                type: boolean
+              selector:
+                description: |-
+                  selector narrows which Deployments in this namespace the window applies
+                  to. Omit it to cover the whole namespace, which is the common case: an
+                  IdleWindow already scopes itself to one namespace, and declaring "this
+                  namespace is idle at these hours" is the thing most people mean.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              sleepAt:
+                description: |-
+                  sleepAt is a five-field cron expression marking the start of the idle
+                  window, evaluated in timezone.
+                minLength: 9
+                type: string
+              suspend:
+                default: false
+                description: |-
+                  suspend stops the controller from acting without deleting the object,
+                  so a window can be disabled during an incident and restored afterwards.
+                type: boolean
+              timezone:
+                default: Asia/Seoul
+                description: |-
+                  timezone is an IANA location name used to evaluate sleepAt and wakeAt.
+                  Schedules are written by people in a specific place; pinning to UTC
+                  silently shifts the window twice a year for locations with DST.
+                type: string
+              wakeAt:
+                description: |-
+                  wakeAt is a five-field cron expression marking the end of the idle
+                  window, evaluated in timezone.
+                minLength: 9
+                type: string
+            required:
+            - sleepAt
+            - wakeAt
+            type: object
+          status:
+            description: status defines the observed state of IdleWindow
+            properties:
+              affectedWorkloads:
+                description: |-
+                  affectedWorkloads counts the Deployments this window currently holds
+                  scaled down.
+                format: int32
+                type: integer
+              blockingPDBs:
+                description: |-
+                  blockingPDBs counts PodDisruptionBudgets in this namespace that
+                  currently allow no disruption at all. Those do not stop this controller
+                  from changing replica counts, but they do stop a node from being
+                  drained, which is where the saving actually comes from.
+                format: int32
+                type: integer
+              conditions:
+                description: conditions represent the current state of the IdleWindow
+                  resource.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              drainableNodes:
+                description: |-
+                  drainableNodes counts worker nodes whose only remaining pods are managed
+                  by DaemonSets. Those nodes are the ones a node autoscaler can actually
+                  remove, and removing them is where the money is — scaling pods to zero
+                  on a node that stays running saves nothing.
+
+                  This is a cluster-wide observation reported by a namespaced object, so
+                  two IdleWindows in different namespaces will report the same figure.
+                format: int32
+                type: integer
+              lastTransitionTime:
+                description: lastTransitionTime is when the phase last changed.
+                format: date-time
+                type: string
+              nextTransitionTime:
+                description: |-
+                  nextTransitionTime is when the phase is expected to change. It doubles
+                  as a check that the schedule was parsed the way the author intended.
+                format: date-time
+                type: string
+              observedGeneration:
+                description: observedGeneration is the spec generation this status
+                  reflects.
+                format: int64
+                type: integer
+              phase:
+                description: phase is Awake or Asleep, derived from the current time.
+                type: string
+              reclaimed:
+                additionalProperties:
+                  anyOf:
+                  - type: integer
+                  - type: string
+                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                  x-kubernetes-int-or-string: true
+                description: |-
+                  reclaimed is the sum of resource requests currently not scheduled
+                  because of this window. This is a measurement, not a cost estimate —
+                  converting it to money requires pricing the controller does not have.
+                type: object
+              skippedWorkloads:
+                description: |-
+                  skippedWorkloads counts selected Deployments deliberately left alone —
+                  an attached HPA, or a manual scale being respected. Without this the
+                  controller looks like it silently did nothing.
+                format: int32
+                type: integer
+              workerNodes:
+                description: |-
+                  workerNodes is the number of non-control-plane nodes considered, so
+                  drainableNodes can be read as a fraction rather than a bare count.
+                format: int32
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-controller-manager
+  namespace: idle-reaper-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-leader-election-role
+  namespace: idle-reaper-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-idlewindow-admin-role
+rules:
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows
+  verbs:
+  - '*'
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-idlewindow-editor-role
+rules:
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-idlewindow-viewer-role
+rules:
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: idle-reaper-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - idlewindows/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: idle-reaper-metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: idle-reaper-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-leader-election-rolebinding
+  namespace: idle-reaper-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: idle-reaper-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: idle-reaper-controller-manager
+  namespace: idle-reaper-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: idle-reaper-manager-role
+subjects:
+- kind: ServiceAccount
+  name: idle-reaper-controller-manager
+  namespace: idle-reaper-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: idle-reaper-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: idle-reaper-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: idle-reaper-controller-manager
+  namespace: idle-reaper-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+    control-plane: controller-manager
+  name: idle-reaper-controller-manager-metrics-service
+  namespace: idle-reaper-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: idle-reaper
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+    control-plane: controller-manager
+  name: idle-reaper-controller-manager
+  namespace: idle-reaper-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: idle-reaper
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: idle-reaper
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --metrics-bind-address=:8443
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        command:
+        - /manager
+        image: controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts: []
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: idle-reaper-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes: []
