@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Annotations written onto the workloads this controller scales.
@@ -198,5 +199,8 @@ type IdleWindowList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&IdleWindow{}, &IdleWindowList{})
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) error {
+		scheme.AddKnownTypes(SchemeGroupVersion, &IdleWindow{}, &IdleWindowList{})
+		return nil
+	})
 }
