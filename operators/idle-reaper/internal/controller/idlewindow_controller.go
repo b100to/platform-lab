@@ -148,26 +148,25 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{RequeueAfter: requeueAfter(r.now(), state.next)}, nil
 }
 
-// selectDeployments returns the Deployments in the window's namespace that its
-// selector matches.
+// selectDeployments returns the Deployments this window applies to.
 //
-// An empty selector is treated as matching nothing. The Kubernetes convention
-// is the opposite — an empty selector matches everything — which here would
-// mean a single omitted field silently scales an entire namespace to zero.
+// No selector means the whole namespace. The object is already namespace
+// scoped, and the statement being made — "this namespace is idle at these
+// hours" — is usually about all of it. A selector is how you carve out less,
+// not how you opt in.
 func (r *IdleWindowReconciler) selectDeployments(ctx context.Context, w *finopsv1alpha1.IdleWindow) ([]appsv1.Deployment, error) {
-	if len(w.Spec.Selector.MatchLabels) == 0 && len(w.Spec.Selector.MatchExpressions) == 0 {
-		return nil, nil
-	}
-	sel, err := metav1.LabelSelectorAsSelector(&w.Spec.Selector)
-	if err != nil {
-		return nil, err
+	opts := []client.ListOption{client.InNamespace(w.Namespace)}
+
+	if w.Spec.Selector != nil {
+		sel, err := metav1.LabelSelectorAsSelector(w.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, client.MatchingLabelsSelector{Selector: sel})
 	}
 
 	var list appsv1.DeploymentList
-	if err := r.List(ctx, &list,
-		client.InNamespace(w.Namespace),
-		client.MatchingLabelsSelector{Selector: sel},
-	); err != nil {
+	if err := r.List(ctx, &list, opts...); err != nil {
 		return nil, err
 	}
 	return list.Items, nil
@@ -410,12 +409,11 @@ func (r *IdleWindowReconciler) windowsForDeployment(ctx context.Context, obj cli
 	var reqs []reconcile.Request
 	for i := range windows.Items {
 		w := &windows.Items[i]
-		if len(w.Spec.Selector.MatchLabels) == 0 && len(w.Spec.Selector.MatchExpressions) == 0 {
-			continue
-		}
-		sel, err := metav1.LabelSelectorAsSelector(&w.Spec.Selector)
-		if err != nil || !sel.Matches(labels.Set(dep.Labels)) {
-			continue
+		if w.Spec.Selector != nil {
+			sel, err := metav1.LabelSelectorAsSelector(w.Spec.Selector)
+			if err != nil || !sel.Matches(labels.Set(dep.Labels)) {
+				continue
+			}
 		}
 		reqs = append(reqs, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(w),

@@ -64,12 +64,12 @@ const (
 // current time against this declaration on every reconcile, so a missed event
 // or a controller restart cannot leave workloads in the wrong state.
 type IdleWindowSpec struct {
-	// selector chooses the Deployments in this namespace that the window
-	// applies to. An empty selector matches nothing rather than everything —
-	// scaling every workload in a namespace should never be the accidental
-	// default.
-	// +required
-	Selector metav1.LabelSelector `json:"selector"`
+	// selector narrows which Deployments in this namespace the window applies
+	// to. Omit it to cover the whole namespace, which is the common case: an
+	// IdleWindow already scopes itself to one namespace, and declaring "this
+	// namespace is idle at these hours" is the thing most people mean.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// sleepAt is a five-field cron expression marking the start of the idle
 	// window, evaluated in timezone.

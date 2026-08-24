@@ -78,10 +78,10 @@ spec:
                 type: boolean
               selector:
                 description: |-
-                  selector chooses the Deployments in this namespace that the window
-                  applies to. An empty selector matches nothing rather than everything —
-                  scaling every workload in a namespace should never be the accidental
-                  default.
+                  selector narrows which Deployments in this namespace the window applies
+                  to. Omit it to cover the whole namespace, which is the common case: an
+                  IdleWindow already scopes itself to one namespace, and declaring "this
+                  namespace is idle at these hours" is the thing most people mean.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -159,7 +159,6 @@ spec:
                 minLength: 9
                 type: string
             required:
-            - selector
             - sleepAt
             - wakeAt
             type: object
