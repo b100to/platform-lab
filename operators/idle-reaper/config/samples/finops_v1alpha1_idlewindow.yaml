@@ -4,8 +4,9 @@ metadata:
   labels:
     app.kubernetes.io/name: idle-reaper
   name: dev-nights
+  namespace: lab-dev
 spec:
-  # Matches the demo workload in ../../../apps/demo
+  # Matches the scalable fixtures in ../../../apps/testbed
   selector:
     matchLabels:
       app: demo

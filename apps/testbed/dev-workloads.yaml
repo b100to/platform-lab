@@ -1,0 +1,128 @@
+# Three ordinary targets with deliberately different replica counts.
+# Restoring 3/2/1 correctly is the check — a controller that restores
+# everything to the same number passes a single-workload test and fails here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: lab-dev
+  labels: { app: demo, tier: api }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: demo, tier: api } }
+  template:
+    metadata:
+      labels: { app: demo, tier: api }
+    spec:
+      containers:
+        - name: agnhost
+          image: registry.k8s.io/e2e-test-images/agnhost:2.47
+          args: ["netexec", "--http-port=8080"]
+          resources:
+            requests: { cpu: 200m, memory: 256Mi }
+            limits: { memory: 256Mi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: lab-dev
+  labels: { app: demo, tier: worker }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: demo, tier: worker } }
+  template:
+    metadata:
+      labels: { app: demo, tier: worker }
+    spec:
+      containers:
+        - name: agnhost
+          image: registry.k8s.io/e2e-test-images/agnhost:2.47
+          args: ["netexec", "--http-port=8080"]
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 128Mi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache
+  namespace: lab-dev
+  labels: { app: demo, tier: cache }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: demo, tier: cache } }
+  template:
+    metadata:
+      labels: { app: demo, tier: cache }
+    spec:
+      containers:
+        - name: agnhost
+          image: registry.k8s.io/e2e-test-images/agnhost:2.47
+          args: ["netexec", "--http-port=8080"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 64Mi }
+---
+# Selected by the window, but carries an HPA. Must be skipped, not scaled (D4).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscaled
+  namespace: lab-dev
+  labels: { app: demo, tier: autoscaled }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: demo, tier: autoscaled } }
+  template:
+    metadata:
+      labels: { app: demo, tier: autoscaled }
+    spec:
+      containers:
+        - name: agnhost
+          image: registry.k8s.io/e2e-test-images/agnhost:2.47
+          args: ["netexec", "--http-port=8080"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 64Mi }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: autoscaled
+  namespace: lab-dev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: autoscaled
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 80 }
+---
+# Not selected by the window. Negative control: proves the selector is applied
+# rather than the controller sweeping the whole namespace.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: untagged
+  namespace: lab-dev
+  labels: { app: other }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: other } }
+  template:
+    metadata:
+      labels: { app: other }
+    spec:
+      containers:
+        - name: agnhost
+          image: registry.k8s.io/e2e-test-images/agnhost:2.47
+          args: ["netexec", "--http-port=8080"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 64Mi }
