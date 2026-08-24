@@ -1,0 +1,36 @@
+# --- secrets / credentials (never commit) ---
+kubeconfig
+kubeconfig-*
+*.kubeconfig
+.kube/
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+secrets/
+*secret*.yaml
+!*sealedsecret*.yaml
+credentials.json
+token.json
+*.secret
+
+# --- terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# --- helm ---
+charts/*.tgz
+**/charts/*.tgz
+
+# --- local / os ---
+.DS_Store
+tmp/
+out/
+*.log

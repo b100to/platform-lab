@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Block commits that contain secrets.
+# Enable once per clone:  git config core.hooksPath .githooks
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks not installed -- install it (brew install gitleaks) or commit with --no-verify at your own risk" >&2
+  exit 1
+fi
+
+gitleaks protect --staged --no-banner --redact
