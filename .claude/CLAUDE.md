@@ -22,9 +22,19 @@
 
 - **Go가 amd64 빌드로 깔려 있으면** 이미지가 aarch64 노드에서 안 돈다.
   `go env GOARCH` 확인할 것.
-- **kind 4노드 동시 조인 시** etcd write latency가 300ms까지 튀고
-  kube-scheduler가 CrashLoopBackOff에 빠진다. 일시적이고 저절로 수렴하니
-  노드가 NotReady로 몇 분 머물러도 재생성하지 말 것.
+- **macOS에서 etcd가 느리다.** 컨테이너 파일시스템 탓에 fsync가 200ms대,
+  스파이크는 700ms를 넘는다. 그러면 lease 갱신이 타임아웃 나고
+  kube-controller-manager / kube-scheduler 가 `leaderelection lost` 로
+  CrashLoopBackOff 에 빠진다. 증상은 **"Deployment 를 만들어도 파드가 안 뜬다"** —
+  ReplicaSet 컨트롤러가 controller-manager 안에 있기 때문이다.
+  `clusters/kind/kind-config.yaml` 에서 두 가지로 해결했다.
+    1. etcd dataDir 을 `/tmp/etcd` 로. kind 노드는 `/tmp` 가 tmpfs 라 RAM 에 쓴다
+       → **컨트롤플레인 컨테이너를 재시작하면 클러스터 상태가 날아간다.**
+       레포에서 전부 재적용하므로 감수한다
+    2. 컨트롤플레인이 하나뿐이라 leader election 을 끈다 (`leader-elect: false`)
+  적용 후 etcd 지연 경고 96회 → 1회, 노드 Ready 까지 7분 → 1분.
+- **kind 의 kubeadm 설정은 `v1beta3`** 이다. `extraArgs` 를 v1beta4 의 리스트
+  형식으로 쓰면 `cannot unmarshal array into Go struct field` 로 실패한다. 맵으로 쓸 것.
 
 ## 보안 — public 레포다
 

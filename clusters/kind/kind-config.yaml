@@ -1,9 +1,31 @@
 # 4-node kind cluster: 1 control-plane + 3 workers.
-# Multi-worker is required to exercise node-failure scenarios and
-# TopologySpreadConstraints — the reason this lab exists.
+# Multi-worker is required to exercise placement and spread behaviour.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: lab
+
+# Two workarounds for running a control plane on macOS, where the container
+# filesystem makes etcd fsync slow enough (200ms+, spiking past 700ms) that
+# lease renewals time out and kube-controller-manager crash-loops on
+# "leaderelection lost".
+#
+#   1. etcd on /tmp, which kind mounts as tmpfs -> writes stay in RAM.
+#      Trade-off: restarting the control-plane container wipes cluster state.
+#      Acceptable here because everything is reapplied from this repo.
+#   2. Leader election off. With a single control-plane there is nothing to
+#      elect against, so the lease is pure overhead and a failure mode.
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    etcd:
+      local:
+        dataDir: /tmp/etcd
+    controllerManager:
+      extraArgs:
+        leader-elect: "false"
+    scheduler:
+      extraArgs:
+        leader-elect: "false"
 
 nodes:
   - role: control-plane
