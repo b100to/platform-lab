@@ -20,6 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -58,8 +59,17 @@ type nodeCensus struct {
 // controller only reports how many became removable, so the two concerns do
 // not fight over the same resource.
 func (r *IdleWindowReconciler) countDrainableNodes(ctx context.Context) (nodeCensus, error) {
+	// Only nodes the operator is meant to empty are counted. A cluster
+	// usually keeps a slice of capacity that must survive — ingress,
+	// monitoring, and this controller itself — and counting those makes the
+	// denominator one that can never be filled.
+	opts := []client.ListOption{}
+	if r.ReclaimableNodes != nil && !r.ReclaimableNodes.Empty() {
+		opts = append(opts, client.MatchingLabelsSelector{Selector: r.ReclaimableNodes})
+	}
+
 	var nodes corev1.NodeList
-	if err := r.List(ctx, &nodes); err != nil {
+	if err := r.List(ctx, &nodes, opts...); err != nil {
 		return nodeCensus{}, err
 	}
 

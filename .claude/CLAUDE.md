@@ -15,6 +15,7 @@
 | 컨테이너 런타임 | OrbStack |
 | 클러스터 | kind 4노드 (control-plane 1 + worker 3) |
 | 노드 존 라벨 | worker에 `zone-a/b/c` |
+| 노드 역할 | `lab-worker`=infra(taint `dedicated=infra:NoSchedule`), `lab-worker2/3`=app |
 | 호스트 포트 | **18080 / 18443** (8080·8443은 로컬에서 이미 사용 중) |
 | 호스트 아키텍처 | **arm64** — 이미지 빌드 시 주의 |
 
@@ -33,6 +34,13 @@
        레포에서 전부 재적용하므로 감수한다
     2. 컨트롤플레인이 하나뿐이라 leader election 을 끈다 (`leader-elect: false`)
   적용 후 etcd 지연 경고 96회 → 1회, 노드 Ready 까지 7분 → 1분.
+- **kind config 의 `labels:` 로 `node-role.kubernetes.io/*` 를 붙이면 노드가 안 뜬다.**
+  이 라벨은 kubelet 이 등록 시 자기에게 붙이는데, NodeRestriction admission 이
+  그 접두사를 거부한다. 등록이 실패하면 join 이
+  `could not find a JWS signature in the cluster-info ConfigMap` 이라는
+  엉뚱한 메시지로 죽어서 원인을 찾기 어렵다. 커스텀 도메인
+  (`platform-lab.dev/role`) 을 쓰거나 생성 후 kubectl 로 붙일 것.
+  taint 는 `JoinConfiguration.nodeRegistration.taints` 로 문제없이 걸린다.
 - **kind 의 kubeadm 설정은 `v1beta3`** 이다. `extraArgs` 를 v1beta4 의 리스트
   형식으로 쓰면 `cannot unmarshal array into Go struct field` 로 실패한다. 맵으로 쓸 것.
 

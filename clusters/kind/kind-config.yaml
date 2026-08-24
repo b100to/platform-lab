@@ -45,12 +45,36 @@ nodes:
         hostPort: 18443
         protocol: TCP
 
+  # One node reserved for infrastructure, two for workloads.
+  #
+  # An operator that empties nodes cannot live on a node it is emptying, and
+  # neither can ingress or anything else expected to answer while the cluster
+  # is idle. Splitting the roles also makes "how many nodes became removable"
+  # a fraction that can actually reach its denominator: reclaimable capacity
+  # is the two app nodes, not all three.
+  #
+  # The role label deliberately does not use the node-role.kubernetes.io/
+  # prefix. Labels here are applied by kubelet at registration, and the
+  # NodeRestriction admission plugin refuses to let a kubelet label itself
+  # with that prefix — the node never registers and the join fails with a
+  # misleading "could not find a JWS signature" error.
   - role: worker
     labels:
       topology.kubernetes.io/zone: zone-a
+      platform-lab.dev/role: infra
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          taints:
+            - key: dedicated
+              value: infra
+              effect: NoSchedule
   - role: worker
     labels:
       topology.kubernetes.io/zone: zone-b
+      platform-lab.dev/role: app
   - role: worker
     labels:
       topology.kubernetes.io/zone: zone-c
+      platform-lab.dev/role: app

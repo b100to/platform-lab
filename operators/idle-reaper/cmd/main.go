@@ -25,6 +25,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -54,6 +55,7 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	var reclaimableNodeSelector string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -62,6 +64,10 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	flag.StringVar(&reclaimableNodeSelector, "reclaimable-node-selector", "",
+		"Label selector for nodes the operator may count as reclaimable. Empty means every "+
+			"node that is neither control-plane nor Fargate. Use this to exclude capacity that "+
+			"must stay up, e.g. '!node-role.kubernetes.io/infra'.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -178,9 +184,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	reclaimable, err := labels.Parse(reclaimableNodeSelector)
+	if err != nil {
+		setupLog.Error(err, "Invalid --reclaimable-node-selector")
+		os.Exit(1)
+	}
+
 	if err := (&controller.IdleWindowReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		ReclaimableNodes: reclaimable,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "idlewindow")
 		os.Exit(1)

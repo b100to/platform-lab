@@ -48,6 +48,13 @@ type IdleWindowReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
+	// ReclaimableNodes narrows which nodes count toward drainableNodes and
+	// workerNodes. Clusters normally reserve capacity that has to stay up —
+	// ingress, monitoring, this controller — and including it would report a
+	// fraction that can never reach its denominator. Nil counts every node
+	// that is neither control-plane nor Fargate.
+	ReclaimableNodes labels.Selector
+
 	// Now is injectable so tests can place the clock inside or outside a
 	// window without waiting for wall time.
 	Now func() time.Time
