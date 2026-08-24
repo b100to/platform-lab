@@ -3,4 +3,3 @@ kind: Kustomization
 resources:
   - namespaces.yaml
   - dev-workloads.yaml
-  - prod-workload.yaml

@@ -56,6 +56,8 @@ type IdleWindowReconciler struct {
 // +kubebuilder:rbac:groups=finops.b100to.dev,resources=idlewindows/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // tally accumulates what one pass over the selected workloads did.
@@ -132,11 +134,18 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.event(&window, corev1.EventTypeNormal, "PhaseChanged", "now "+phase)
 	}
 
+	census, err := r.countDrainableNodes(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	next := metav1.NewTime(state.next)
 	window.Status.Phase = phase
 	window.Status.AffectedWorkloads = t.affected
 	window.Status.SkippedWorkloads = t.skipped
 	window.Status.Reclaimed = t.reclaimed
+	window.Status.DrainableNodes = census.drainable
+	window.Status.WorkerNodes = census.workers
 	window.Status.NextTransitionTime = &next
 	window.Status.ObservedGeneration = window.Generation
 	r.setReady(&window, metav1.ConditionTrue, "Reconciled",

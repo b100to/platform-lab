@@ -134,13 +134,28 @@ type IdleWindowStatus struct {
 	// affectedWorkloads counts the Deployments this window currently holds
 	// scaled down.
 	// +optional
-	AffectedWorkloads int32 `json:"affectedWorkloads,omitempty"`
+	AffectedWorkloads int32 `json:"affectedWorkloads"`
 
 	// skippedWorkloads counts selected Deployments deliberately left alone —
 	// an attached HPA, or a manual scale being respected. Without this the
 	// controller looks like it silently did nothing.
 	// +optional
-	SkippedWorkloads int32 `json:"skippedWorkloads,omitempty"`
+	SkippedWorkloads int32 `json:"skippedWorkloads"`
+
+	// drainableNodes counts worker nodes whose only remaining pods are managed
+	// by DaemonSets. Those nodes are the ones a node autoscaler can actually
+	// remove, and removing them is where the money is — scaling pods to zero
+	// on a node that stays running saves nothing.
+	//
+	// This is a cluster-wide observation reported by a namespaced object, so
+	// two IdleWindows in different namespaces will report the same figure.
+	// +optional
+	DrainableNodes int32 `json:"drainableNodes"`
+
+	// workerNodes is the number of non-control-plane nodes considered, so
+	// drainableNodes can be read as a fraction rather than a bare count.
+	// +optional
+	WorkerNodes int32 `json:"workerNodes"`
 
 	// nextTransitionTime is when the phase is expected to change. It doubles
 	// as a check that the schedule was parsed the way the author intended.
@@ -169,6 +184,8 @@ type IdleWindowStatus struct {
 // +kubebuilder:printcolumn:name="Scaled",type=integer,JSONPath=`.status.affectedWorkloads`
 // +kubebuilder:printcolumn:name="Skipped",type=integer,JSONPath=`.status.skippedWorkloads`
 // +kubebuilder:printcolumn:name="CPU",type=string,JSONPath=`.status.reclaimed.cpu`
+// +kubebuilder:printcolumn:name="Drainable",type=string,JSONPath=`.status.drainableNodes`
+// +kubebuilder:printcolumn:name="Nodes",type=string,JSONPath=`.status.workerNodes`
 // +kubebuilder:printcolumn:name="Next",type=string,JSONPath=`.status.nextTransitionTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

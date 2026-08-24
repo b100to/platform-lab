@@ -2,10 +2,3 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: lab-dev
----
-# Same labels as lab-dev, different namespace. IdleWindow is namespace-scoped,
-# so nothing here should ever be touched by a window in lab-dev.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: lab-prod

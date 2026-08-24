@@ -8,25 +8,24 @@ specific behaviour observable — or to prove a behaviour does *not* happen.
 | `lab-dev/api` | 3 | yes | scale down, and restore to **3** |
 | `lab-dev/worker` | 2 | yes | restore to **2**, not to some shared default |
 | `lab-dev/cache` | 1 | yes | restore to **1** |
-| `lab-dev/autoscaled` | 2 | yes | skipped because an HPA owns its replicas (D4) |
-| `lab-dev/untagged` | 1 | no | the selector is applied — the namespace is not swept |
-| `lab-prod/api` | 2 | no | namespace boundary holds despite identical labels |
+| `lab-dev/autoscaled` | 2 | yes | carries an HPA — skipped while `skipIfHPA` is on (D4) |
+| `lab-dev/untagged` | 1 | yes | different labels, so a selector can exclude it
 
 The three different replica counts are the point. A controller that restores
 every workload to the same number passes a single-workload test and fails here.
 
 ## Expected reclaim
 
-When `lab-dev` is asleep, the requests released by the three scalable
-workloads are:
+With no selector and `skipIfHPA: false`, the whole namespace goes to zero:
 
 ```
-cpu    3×200m + 2×100m + 1×50m  =  850m
-memory 3×256Mi + 2×128Mi + 1×64Mi = 1088Mi
+cpu    3×200m + 2×100m + 1×50m + 2×50m + 1×50m  =  1000m
+memory 3×256Mi + 2×128Mi + 1×64Mi + 2×64Mi + 1×64Mi = 1280Mi
 ```
 
-`autoscaled` and `untagged` are excluded, so their requests must **not** appear
-in `status.reclaimed`.
+Narrowing with `selector: {app: demo}` and `skipIfHPA: true` leaves only
+api/worker/cache, which reclaims 850m / 1088Mi instead. Both numbers are worth
+checking against `status.reclaimed`.
 
 ## Use
 

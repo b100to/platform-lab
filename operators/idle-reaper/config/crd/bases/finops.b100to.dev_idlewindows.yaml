@@ -29,6 +29,12 @@ spec:
     - jsonPath: .status.reclaimed.cpu
       name: CPU
       type: string
+    - jsonPath: .status.drainableNodes
+      name: Drainable
+      type: string
+    - jsonPath: .status.workerNodes
+      name: Nodes
+      type: string
     - jsonPath: .status.nextTransitionTime
       name: Next
       type: string
@@ -232,6 +238,17 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              drainableNodes:
+                description: |-
+                  drainableNodes counts worker nodes whose only remaining pods are managed
+                  by DaemonSets. Those nodes are the ones a node autoscaler can actually
+                  remove, and removing them is where the money is — scaling pods to zero
+                  on a node that stays running saves nothing.
+
+                  This is a cluster-wide observation reported by a namespaced object, so
+                  two IdleWindows in different namespaces will report the same figure.
+                format: int32
+                type: integer
               lastTransitionTime:
                 description: lastTransitionTime is when the phase last changed.
                 format: date-time
@@ -267,6 +284,12 @@ spec:
                   skippedWorkloads counts selected Deployments deliberately left alone —
                   an attached HPA, or a manual scale being respected. Without this the
                   controller looks like it silently did nothing.
+                format: int32
+                type: integer
+              workerNodes:
+                description: |-
+                  workerNodes is the number of non-control-plane nodes considered, so
+                  drainableNodes can be read as a fraction rather than a bare count.
                 format: int32
                 type: integer
             type: object
