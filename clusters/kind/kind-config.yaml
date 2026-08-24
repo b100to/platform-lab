@@ -14,13 +14,13 @@ nodes:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
     extraPortMappings:
-      # host:8080 -> ingress controller (http)
+      # host:18080 -> ingress controller (http). 8080/8443 avoided: already taken locally.
       - containerPort: 30080
-        hostPort: 8080
+        hostPort: 18080
         protocol: TCP
-      # host:8443 -> ingress controller (https)
+      # host:18443 -> ingress controller (https)
       - containerPort: 30443
-        hostPort: 8443
+        hostPort: 18443
         protocol: TCP
 
   - role: worker
