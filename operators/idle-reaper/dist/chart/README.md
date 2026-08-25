@@ -23,6 +23,19 @@ dev-nights   Asleep   4        1         900m   1           2
 Unblocked=False   not fully reclaimable: autoscaled (HPA), cache (PDB)
 ```
 
+## What a window covers
+
+- **Its own namespace, and only that.** `IdleWindow` is namespace-scoped, so
+  each team writes its own with its own hours.
+- **Deployments.** StatefulSets are left alone — scaling storage-backed
+  workloads to zero is a different risk. DaemonSets and CronJobs are untouched.
+- **All of them, unless narrowed.** Omitting `selector` covers the whole
+  namespace. A selector carves out less; it is not how you opt in.
+
+Workloads whose replicas an HPA already owns, and workloads somebody scaled by
+hand during the window, are skipped — and reported rather than silently passed
+over.
+
 ## Install
 
 ```sh
@@ -78,6 +91,9 @@ manager:
 - **Touch StatefulSets.** Scaling storage-backed workloads to zero is a
   different risk, and out of scope for `v1alpha1`.
 - **Route alerts.** State is exposed as conditions, Events and metrics.
+- **Cover several namespaces from one object.** A cluster-scoped kind is the
+  obvious next step; what it needs first is a rule for workloads covered by
+  both it and their own namespace's window.
 
 ## Lifting a window
 

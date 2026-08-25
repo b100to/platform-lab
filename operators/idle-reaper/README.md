@@ -19,6 +19,20 @@ Three lines. Everything else — timezone, minimum replicas, how to treat an
 HPA, whether to respect a manual scale — has a default that errs toward doing
 nothing surprising.
 
+## What a window covers
+
+| | |
+|---|---|
+| **Its own namespace, and only that.** | `IdleWindow` is namespace-scoped; a window in `team-a` cannot reach `team-b`. Each team writes its own, with its own hours. |
+| **Deployments.** | StatefulSets are left alone — scaling storage-backed workloads to zero is a different risk. DaemonSets and CronJobs are not touched either. |
+| **All of them, unless narrowed.** | Omitting `selector` covers the whole namespace, which is usually what "this namespace is idle at these hours" means. A selector carves out less; it is not how you opt in. |
+
+Two kinds of workload are skipped even when selected: one whose replicas an
+HPA already owns, and one somebody scaled by hand during the window. Both are
+reported rather than silently passed over — see the `Unblocked` condition
+above.
+
+
 ## What it looks like running
 
 ```
@@ -154,6 +168,24 @@ make lab-wake
 
 Waiting until 20:00 to watch a night window work is not a demo, so `lab-sleep`
 builds the schedule around the current hour instead.
+
+## No cluster-wide window, yet
+
+Covering "every namespace labelled `env=dev`" from one object is a real need —
+fifty namespaces should not mean fifty windows — and the shape is the familiar
+one: a cluster-scoped `ClusterIdleWindow` alongside the namespaced kind, the
+way cert-manager pairs `Issuer` with `ClusterIssuer`.
+
+It is not here because the hard part is not the object. A workload covered by
+both a cluster window and its own namespace's window needs a rule, and the
+rule decides who really owns the schedule:
+
+- the more specific one wins — a team can quietly opt out of platform policy
+- the more conservative one wins — less is reclaimed than either intended
+- overlap is rejected — unambiguous, and tedious to operate
+
+Picking wrong is expensive later, because the answer becomes API behaviour
+people build on. Namespace ownership was worth settling first.
 
 ## Known limitations
 
