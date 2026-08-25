@@ -115,7 +115,7 @@ model, including the sensitivity of its most load-bearing assumption.
 
 ```sh
 helm install idle-reaper oci://ghcr.io/b100to/charts/idle-reaper \
-  --version 0.1.2 \
+  --version 0.1.3 \
   --namespace idle-reaper-system --create-namespace
 ```
 
