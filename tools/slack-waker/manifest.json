@@ -1,0 +1,40 @@
+{
+  "display_information": {
+    "name": "wake-bot",
+    "description": "Lift an idle window for a while, from Slack",
+    "background_color": "#2c2d30",
+    "long_description": "Creates a WakeRequest in the Kubernetes namespace mapped to the channel the command was run in. The request carries a duration and a reason, expires on its own, and is capped by the IdleWindow policy for that namespace. The bot holds no state and cannot edit the policy itself."
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "wake-bot",
+      "always_online": false
+    },
+    "slash_commands": [
+      {
+        "command": "/wake",
+        "description": "Keep this namespace awake for a while",
+        "usage_hint": "3h deploying a hotfix",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "commands",
+        "chat:write",
+        "users:read",
+        "users:read.email"
+      ]
+    }
+  },
+  "settings": {
+    "interactivity": {
+      "is_enabled": false
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}

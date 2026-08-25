@@ -1,0 +1,5 @@
+# Local CLI state: which app this checkout is linked to, and its cache.
+# The manifest is the shared artifact; this is per-machine.
+.slack/apps.json
+.slack/config.json
+.slack/cache/

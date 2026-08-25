@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wake-bot
+  namespace: idle-reaper-system
+  labels: { app: wake-bot }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: wake-bot }
+  template:
+    metadata:
+      labels: { app: wake-bot }
+    spec:
+      serviceAccountName: wake-bot
+      # Same reasoning as the operator: a bot that lives on the capacity being
+      # reclaimed disappears with it, and then nobody can ask for it back.
+      nodeSelector:
+        platform-lab.dev/role: infra
+      tolerations:
+        - { key: dedicated, value: infra, effect: NoSchedule }
+      containers:
+        - name: bot
+          image: slack-waker:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            # Which channel may act on which namespace. Configuration rather
+            # than a naming convention: a convention would grant access to any
+            # namespace the moment someone named a channel to match.
+            - name: CHANNEL_NAMESPACES
+              value: "team-a-dev=lab-dev"
+            - name: SLACK_APP_TOKEN
+              valueFrom:
+                secretKeyRef: { name: wake-bot-slack, key: appToken }
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: wake-bot-slack, key: botToken }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 64Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }

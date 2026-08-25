@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wake-bot
+  namespace: idle-reaper-system
+---
+# The bot may create wake requests in lab-dev and do nothing else, anywhere.
+#
+# This is the whole security argument for having a WakeRequest object at all.
+# A bot that scaled Deployments directly would need write access to workloads,
+# and anyone who could talk to the bot would inherit it. Here the worst a
+# compromised bot can do is ask a namespace to stay awake — bounded by the
+# IdleWindow's own maxWakeDuration, which the bot cannot read or change.
+#
+# Note what is absent: no access to idlewindows (the policy), no deployments,
+# no secrets, no other namespace. A Role rather than a ClusterRole, so adding
+# a namespace to the bot is a deliberate act.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wake-requester
+  namespace: lab-dev
+rules:
+  - apiGroups: ["finops.b100to.dev"]
+    resources: ["wakerequests"]
+    verbs: ["create", "get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wake-bot
+  namespace: lab-dev
+subjects:
+  - kind: ServiceAccount
+    name: wake-bot
+    namespace: idle-reaper-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wake-requester
