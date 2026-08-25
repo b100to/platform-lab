@@ -28,10 +28,27 @@ control-plane node (8080/8443 were already taken locally).
 | Path | What |
 |------|------|
 | `clusters/kind/` | Cluster topology |
-| `operators/` | Controllers built here |
+| [`operators/idle-reaper/`](operators/idle-reaper) | An operator that scales an idle namespace down and reports what stops the cluster from shrinking |
 | `apps/demo/` | Sample workload to test against |
 | `scripts/probe.sh` | Availability probe — reports error rate and longest outage |
-| `platform/` | Platform components |
+| `platform/` | Install-time values for the components above |
+
+## idle-reaper
+
+The one thing here that is more than an experiment. It declares when a
+namespace is idle, scales its workloads down while it is, and reports which
+workload or PodDisruptionBudget is keeping a node from being removed.
+
+```sh
+make lab-install     # CRD and test workloads
+make lab-deploy      # build the image, load it, install the chart
+make lab-sleep       # place the current moment inside an idle window
+make lab-status
+make lab-wake
+```
+
+See [operators/idle-reaper](operators/idle-reaper) for what it does and
+[its design notes](operators/idle-reaper/DESIGN.md) for why.
 
 ## Conventions
 

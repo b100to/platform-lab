@@ -1,135 +1,142 @@
 # idle-reaper
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+A Kubernetes operator that declares when a namespace is idle, scales its
+workloads down while it is, and reports what stopped the cluster from
+shrinking any further.
 
-## Getting Started
-
-### Prerequisites
-- go version v1.24.6+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
-
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
-
-```sh
-make docker-build docker-push IMG=<some-registry>/idle-reaper:tag
+```yaml
+apiVersion: finops.b100to.dev/v1alpha1
+kind: IdleWindow
+metadata:
+  name: dev-nights
+  namespace: team-a
+spec:
+  sleepAt: "0 20 * * 1-5"
+  wakeAt: "0 9 * * 1-5"
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+Three lines. Everything else — timezone, minimum replicas, how to treat an
+HPA, whether to respect a manual scale — has a default that errs toward doing
+nothing surprising.
 
-**Install the CRDs into the cluster:**
+## What it looks like running
 
-```sh
-make install
+```
+$ kubectl get idlewindow -n team-a
+NAME         PHASE    SCALED   SKIPPED   CPU    DRAINABLE   NODES   NEXT
+dev-nights   Asleep   4        1         900m   1           2       2026-08-24T11:00:00Z
+
+$ kubectl describe idlewindow dev-nights -n team-a
+Status:
+  Conditions:
+    Type:     Unblocked
+    Status:   False
+    Reason:   ReclaimBlocked
+    Message:  not fully reclaimable: autoscaled (HPA), cache (PDB)
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+The last line is the point. Four workloads shrank, one did not, and one node
+still cannot be removed — and the object says which and why, rather than
+leaving a counter to be interpreted.
+
+## Why a controller and not a scheduled job
+
+Scaling workloads on a timer is a cron job's worth of work. The reasons to
+spend a controller on it are specific:
+
+**It reads state, not events.** Every pass compares the clock against the
+declaration and the cluster against both. A missed event, a restarted
+controller and a duplicate call all produce the same result, because none of
+them are inputs. A job that fired at 20:00 and failed has simply not run.
+
+**The original size lives with the workload.** Replica counts are recorded as
+annotations on the Deployments themselves, so deleting the IdleWindow — or
+losing the operator entirely — never strands a workload at zero with no record
+of where it came from.
+
+**It can tell the difference between quiet and broken.** A cron job reports
+that it ran. This reports that four workloads shrank, one was left alone
+because an HPA owns its replicas, and one PodDisruptionBudget will refuse to
+let a node drain. Those are the facts that decide whether the saving is real.
+
+**Someone scaling up at midnight wins.** If a replica count no longer matches
+what the operator last wrote, that is a person acting deliberately, and the
+window stands down until the next boundary rather than overriding them.
+
+## What it will not do
+
+- **Remove nodes.** Emptying workloads is where this stops; taking the node
+  away belongs to a node autoscaler. Two controllers deciding the fate of the
+  same node is a bad trade for a number this one can simply report.
+- **Touch StatefulSets.** Scaling something with attached storage to zero is a
+  different risk, and out of scope for `v1alpha1`.
+- **Route alerts.** State is exposed as conditions, Events and metrics.
+  Deciding who hears about it is the monitoring stack's job, and an operator
+  holding webhook credentials is one that cannot be handed to anyone else.
+- **Protect production by name.** Namespace names are a weak guard. RBAC and
+  deployment policy are the right place for that.
+
+## Measured, and modelled
+
+`status.reclaimed` is measured: the resource requests currently not scheduled
+because of this window.
+
+Money is not. Converting requests into a bill needs pricing the cluster does
+not have, and a node autoscaler to actually remove the emptied nodes.
+[`DESIGN.md`](DESIGN.md) carries a worked model — a 20-service dev cluster on
+six `m5.xlarge` nodes, reclaiming 67% of the week — and it stays labelled as a
+model, including the sensitivity of its most load-bearing assumption.
+
+## Install
 
 ```sh
-make deploy IMG=<some-registry>/idle-reaper:tag
+helm install idle-reaper oci://ghcr.io/b100to/charts/idle-reaper \
+  --namespace idle-reaper-system --create-namespace
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+Two settings matter on a real cluster:
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+```yaml
+manager:
+  args:
+    # Only this capacity is reported as reclaimable.
+    - --reclaimable-node-selector=node-role/app
+  # The operator must not run on a node it is emptying.
+  nodeSelector: { node-role/infra: "" }
+  tolerations:
+    - { key: dedicated, value: infra, effect: NoSchedule }
+```
+
+An operator scheduled onto the capacity it reclaims will scale that capacity to
+zero and take itself with it. Fargate, a small managed node group, or a tainted
+infra node all solve this; doing nothing does not.
+
+## Try it locally
+
+From the repository root, against the 4-node kind cluster in
+[`clusters/kind`](../../clusters/kind):
 
 ```sh
-kubectl apply -k config/samples/
+make lab-install     # CRD and a set of test workloads
+make lab-deploy      # build the image, load it, install the chart
+make lab-sleep       # place the current moment inside an idle window
+make lab-status      # workloads, conditions, and what holds each node
+make lab-wake
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+Waiting until 20:00 to watch a night window work is not a demo, so `lab-sleep`
+builds the schedule around the current hour instead.
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+## Known limitations
 
-```sh
-kubectl delete -k config/samples/
-```
+- A workload with an HPA is skipped by default. `hpaPolicy: Scale` overrides
+  this, at the cost of two controllers writing the same field.
+- Manual-scale detection cannot distinguish a person from another controller.
+  A GitOps sync during a window reads as manual intervention.
+- Node counts are a cluster-wide observation reported by a namespaced object.
+  Two IdleWindows report the same figure.
 
-**Delete the APIs(CRDs) from the cluster:**
+## Design
 
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/idle-reaper:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/idle-reaper/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v2-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2026.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+[`DESIGN.md`](DESIGN.md) records the decisions, what each one cost, and the
+ones that were wrong the first time.
