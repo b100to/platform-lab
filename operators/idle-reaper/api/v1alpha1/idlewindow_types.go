@@ -49,6 +49,9 @@ const (
 	PhaseAwake = "Awake"
 	// PhaseAsleep means the current time is inside the idle window.
 	PhaseAsleep = "Asleep"
+	// PhaseWakeRequested means the schedule says asleep but an unexpired
+	// WakeRequest is holding the namespace up.
+	PhaseWakeRequested = "WakeRequested"
 )
 
 // Condition types reported in IdleWindowStatus.
@@ -139,6 +142,19 @@ type IdleWindowSpec struct {
 	// +kubebuilder:default=true
 	RespectManualScale *bool `json:"respectManualScale,omitempty"`
 
+	// maxWakeDuration caps how long a single WakeRequest may hold this
+	// namespace awake. Requests asking for more are rejected.
+	//
+	// The cap lives here, on the policy object, rather than in whatever front
+	// end raises requests. A Slack command or a portal is a client of this
+	// API, and a client is the wrong place to enforce a limit: the API server
+	// has to be the thing that says no, or the limit only holds while the
+	// client behaves.
+	// +optional
+	// +kubebuilder:default="8h"
+	// +kubebuilder:validation:Pattern=`^([0-9]+(\.[0-9]+)?(s|m|h))+$`
+	MaxWakeDuration string `json:"maxWakeDuration,omitempty"`
+
 	// suspend stops the controller from acting without deleting the object,
 	// so a window can be disabled during an incident and restored afterwards.
 	// +optional
@@ -190,6 +206,11 @@ type IdleWindowStatus struct {
 	// drainableNodes can be read as a fraction rather than a bare count.
 	// +optional
 	WorkerNodes int32 `json:"workerNodes"`
+
+	// activeWakeRequests counts the requests currently holding this namespace
+	// awake, so a window that is awake off-schedule says why.
+	// +optional
+	ActiveWakeRequests int32 `json:"activeWakeRequests"`
 
 	// nextTransitionTime is when the phase is expected to change. It doubles
 	// as a check that the schedule was parsed the way the author intended.

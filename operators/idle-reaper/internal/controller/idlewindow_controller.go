@@ -63,12 +63,20 @@ type IdleWindowReconciler struct {
 // +kubebuilder:rbac:groups=finops.b100to.dev,resources=idlewindows,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=finops.b100to.dev,resources=idlewindows/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=finops.b100to.dev,resources=idlewindows/finalizers,verbs=update
+// +kubebuilder:rbac:groups=finops.b100to.dev,resources=wakerequests,verbs=get;list;watch
+// +kubebuilder:rbac:groups=finops.b100to.dev,resources=wakerequests/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+
+// Event type aliases keep the corev1 import out of wakerequest.go.
+const (
+	corev1EventNormal  = corev1.EventTypeNormal
+	corev1EventWarning = corev1.EventTypeWarning
+)
 
 // tally accumulates what one pass over the selected workloads did.
 type tally struct {
@@ -117,6 +125,21 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, r.writeStatus(ctx, &window)
 	}
 
+	wakes, err := r.evaluateWakeRequests(ctx, &window, r.now())
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// A live request outranks the schedule. Someone is working right now, and
+	// a window is a default rather than a rule that has to win.
+	effective := state
+	if state.asleep && wakes.active > 0 {
+		effective.asleep = false
+	}
+	if !wakes.earliestExpiry.IsZero() && wakes.earliestExpiry.Before(effective.next) {
+		effective.next = wakes.earliestExpiry
+	}
+
 	targets, err := r.selectDeployments(ctx, &window)
 	if err != nil {
 		r.setReady(&window, metav1.ConditionFalse, "SelectorError", err.Error())
@@ -132,7 +155,7 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	var t tally
 	t.reclaimed = corev1.ResourceList{}
 	for i := range targets {
-		if err := r.reconcileDeployment(ctx, &window, &targets[i], state, hpaOwned, &t); err != nil {
+		if err := r.reconcileDeployment(ctx, &window, &targets[i], effective, hpaOwned, &t); err != nil {
 			// One workload failing must not strand the rest: a partial pass is
 			// better than an all-or-nothing rollback, and the next reconcile
 			// retries whatever is still out of sync.
@@ -143,8 +166,12 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	phase := finopsv1alpha1.PhaseAwake
-	if state.asleep {
+	switch {
+	case effective.asleep:
 		phase = finopsv1alpha1.PhaseAsleep
+	case state.asleep:
+		// The schedule says asleep; a request is why it is not.
+		phase = finopsv1alpha1.PhaseWakeRequested
 	}
 	if window.Status.Phase != phase {
 		now := metav1.NewTime(r.now())
@@ -162,7 +189,7 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	next := metav1.NewTime(state.next)
+	next := metav1.NewTime(effective.next)
 	window.Status.Phase = phase
 	window.Status.AffectedWorkloads = t.affected
 	window.Status.SkippedWorkloads = t.skipped
@@ -170,6 +197,7 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	window.Status.DrainableNodes = census.drainable
 	window.Status.WorkerNodes = census.workers
 	window.Status.BlockingPDBs = blockingPDBs
+	window.Status.ActiveWakeRequests = wakes.active
 	window.Status.NextTransitionTime = &next
 	window.Status.ObservedGeneration = window.Generation
 	r.setReady(&window, metav1.ConditionTrue, "Reconciled",
@@ -180,7 +208,7 @@ func (r *IdleWindowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 	publishMetrics(&window, census)
-	return ctrl.Result{RequeueAfter: requeueAfter(r.now(), state.next)}, nil
+	return ctrl.Result{RequeueAfter: requeueAfter(r.now(), effective.next)}, nil
 }
 
 // selectDeployments returns the Deployments this window applies to.
@@ -540,6 +568,23 @@ func (r *IdleWindowReconciler) windowsForDeployment(ctx context.Context, obj cli
 	return reqs
 }
 
+// windowsInNamespace maps any object to the IdleWindows sharing its namespace.
+// A WakeRequest names no window: it asks its namespace to stay up, and the
+// window covering that namespace is the one that has to react.
+func (r *IdleWindowReconciler) windowsInNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
+	var windows finopsv1alpha1.IdleWindowList
+	if err := r.List(ctx, &windows, client.InNamespace(obj.GetNamespace())); err != nil {
+		return nil
+	}
+	reqs := make([]reconcile.Request, 0, len(windows.Items))
+	for i := range windows.Items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&windows.Items[i]),
+		})
+	}
+	return reqs
+}
+
 // SetupWithManager registers the controller with the manager.
 func (r *IdleWindowReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.Recorder == nil {
@@ -548,6 +593,7 @@ func (r *IdleWindowReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&finopsv1alpha1.IdleWindow{}).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestsFromMapFunc(r.windowsForDeployment)).
+		Watches(&finopsv1alpha1.WakeRequest{}, handler.EnqueueRequestsFromMapFunc(r.windowsInNamespace)).
 		Named("idlewindow").
 		Complete(r)
 }

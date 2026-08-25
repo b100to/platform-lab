@@ -22,4 +22,12 @@ resources:
   kind: IdleWindow
   path: github.com/b100to/platform-lab/operators/idle-reaper/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: b100to.dev
+  group: finops
+  kind: WakeRequest
+  path: github.com/b100to/platform-lab/operators/idle-reaper/api/v1alpha1
+  version: v1alpha1
 version: "3"

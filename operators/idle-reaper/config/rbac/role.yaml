@@ -60,10 +60,19 @@ rules:
   - finops.b100to.dev
   resources:
   - idlewindows/status
+  - wakerequests/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - policy
   resources:

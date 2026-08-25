@@ -1,0 +1,9 @@
+apiVersion: finops.b100to.dev/v1alpha1
+kind: WakeRequest
+metadata:
+  labels:
+    app.kubernetes.io/name: idle-reaper
+    app.kubernetes.io/managed-by: kustomize
+  name: wakerequest-sample
+spec:
+  # TODO(user): Add fields here

@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the idle-reaper itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- wakerequest_admin_role.yaml
+- wakerequest_editor_role.yaml
+- wakerequest_viewer_role.yaml
 - idlewindow_admin_role.yaml
 - idlewindow_editor_role.yaml
 - idlewindow_viewer_role.yaml
