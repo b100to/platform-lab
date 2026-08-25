@@ -3,7 +3,34 @@
 Local Kubernetes workshop — a 4-node [kind](https://kind.sigs.k8s.io) cluster
 plus whatever I am currently building or testing against it.
 
-Not a curated portfolio. Things land here when I need somewhere to run them.
+Not a curated portfolio. Things land here when I need somewhere to run them —
+except the first one, which outgrew that.
+
+## idle-reaper
+
+An operator that declares when a namespace is idle, scales its workloads down
+while it is, and reports which workload or PodDisruptionBudget is keeping a
+node from being removed — because emptying pods on a node that stays running
+saves nothing.
+
+```sh
+make lab-install     # CRD and test workloads
+make lab-deploy      # build the image, load it, install the chart
+make lab-sleep       # place the current moment inside an idle window
+make lab-status
+make lab-wake
+```
+
+Developers who need a namespace back before the window ends do not file a
+ticket: they ask for it in Slack, and the exception expires on its own.
+
+```
+/wake 3h deploying a hotfix
+```
+
+See [operators/idle-reaper](operators/idle-reaper) for what the operator does,
+[its design notes](operators/idle-reaper/DESIGN.md) for why, and
+[tools/slack-waker](tools/slack-waker) for how the request reaches it.
 
 ## Cluster
 
@@ -33,31 +60,6 @@ control-plane node (8080/8443 were already taken locally).
 | `scripts/probe.sh` | Availability probe — reports error rate and longest outage |
 | [`tools/slack-waker/`](tools/slack-waker) | A Slack command that raises wake requests against the operator |
 | `platform/` | Install-time values for the components above |
-
-## idle-reaper
-
-The one thing here that is more than an experiment. It declares when a
-namespace is idle, scales its workloads down while it is, and reports which
-workload or PodDisruptionBudget is keeping a node from being removed.
-
-```sh
-make lab-install     # CRD and test workloads
-make lab-deploy      # build the image, load it, install the chart
-make lab-sleep       # place the current moment inside an idle window
-make lab-status
-make lab-wake
-```
-
-Developers who need a namespace back before the window ends do not file a
-ticket: they ask for it in Slack, and the exception expires on its own.
-
-```
-/wake 3h deploying a hotfix
-```
-
-See [operators/idle-reaper](operators/idle-reaper) for what the operator does,
-[its design notes](operators/idle-reaper/DESIGN.md) for why, and
-[tools/slack-waker](tools/slack-waker) for how the request reaches it.
 
 ## Conventions
 
