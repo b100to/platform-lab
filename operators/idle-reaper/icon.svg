@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="idle-reaper">
+  <!-- Reads at 48px: three bars stepping down to nothing, under a crescent.
+       Two shapes, two colours, no text — anything finer disappears in a list. -->
+  <rect width="128" height="128" rx="26" fill="#1f2933"/>
+
+  <!-- Workloads shrinking toward zero, left to right. -->
+  <g fill="#4fd1c5">
+    <rect x="24" y="58" width="16" height="44" rx="4"/>
+    <rect x="48" y="74" width="16" height="28" rx="4"/>
+    <rect x="72" y="90" width="16" height="12" rx="4" opacity="0.55"/>
+    <rect x="96" y="98" width="16" height="4"  rx="2" opacity="0.3"/>
+  </g>
+
+  <!-- Crescent: the window during which that happens. -->
+  <path d="M96 20a20 20 0 1 0 12 36 24 24 0 1 1-12-36z" fill="#f6ad55"/>
+</svg>
