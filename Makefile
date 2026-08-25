@@ -107,11 +107,15 @@ lab-chart: ## Regenerate the Helm chart from the kustomize output
 	@# only appears in the cluster: the controller starts, then fails to watch
 	@# a resource it has no permission to list.
 	@cp $(OPERATOR)/dist/chart/Chart.yaml /tmp/idle-reaper-Chart.yaml
+	@cp $(OPERATOR)/dist/chart/README.md /tmp/idle-reaper-chart-README.md
 	$(MAKE) -C $(OPERATOR) manifests
 	cd $(OPERATOR) && kubebuilder edit --plugins=helm/v2-alpha
 	@# The plugin rewrites Chart.yaml with its template text, so the real
 	@# description, sources and maintainers are put back.
 	@cp /tmp/idle-reaper-Chart.yaml $(OPERATOR)/dist/chart/Chart.yaml
+	@# Artifact Hub renders the README from inside the chart package, so it has
+	@# to survive regeneration too.
+	@cp /tmp/idle-reaper-chart-README.md $(OPERATOR)/dist/chart/README.md
 
 lab-image: ## Build the controller image and load it into the kind nodes
 	cd $(OPERATOR) && docker build -t $(IMG) .
