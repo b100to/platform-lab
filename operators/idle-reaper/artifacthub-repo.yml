@@ -1,0 +1,10 @@
+# Ownership metadata for Artifact Hub.
+#
+# Pushed to the OCI repository under the artifacthub.io tag, which is how
+# Artifact Hub verifies that whoever registered the repository also controls
+# the registry it points at. Keeping it in the repo documents which listing
+# this chart belongs to.
+repositoryID: 8de71fcd-f27b-4318-a426-ecf309203ac7
+owners:
+  - name: b100to
+    email: b100hhss@gmail.com
