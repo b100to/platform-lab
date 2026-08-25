@@ -31,6 +31,7 @@ control-plane node (8080/8443 were already taken locally).
 | [`operators/idle-reaper/`](operators/idle-reaper) | An operator that scales an idle namespace down and reports what stops the cluster from shrinking |
 | `apps/demo/` | Sample workload to test against |
 | `scripts/probe.sh` | Availability probe — reports error rate and longest outage |
+| [`tools/slack-waker/`](tools/slack-waker) | A Slack command that raises wake requests against the operator |
 | `platform/` | Install-time values for the components above |
 
 ## idle-reaper
@@ -47,8 +48,16 @@ make lab-status
 make lab-wake
 ```
 
-See [operators/idle-reaper](operators/idle-reaper) for what it does and
-[its design notes](operators/idle-reaper/DESIGN.md) for why.
+Developers who need a namespace back before the window ends do not file a
+ticket: they ask for it in Slack, and the exception expires on its own.
+
+```
+/wake 3h deploying a hotfix
+```
+
+See [operators/idle-reaper](operators/idle-reaper) for what the operator does,
+[its design notes](operators/idle-reaper/DESIGN.md) for why, and
+[tools/slack-waker](tools/slack-waker) for how the request reaches it.
 
 ## Conventions
 

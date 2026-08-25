@@ -6,6 +6,16 @@ metadata:
   labels: { app: wake-bot }
 spec:
   replicas: 1
+  # Recreate, not RollingUpdate.
+  #
+  # Socket Mode delivers each command to one connected instance of its choice.
+  # During a rolling update both the old and the new pod hold a connection,
+  # and a command routed to the one that is shutting down is simply lost —
+  # the user sees "the app didn't respond" with nothing in either log to
+  # explain it. Taking the old connection down first costs a few seconds of
+  # unavailability and removes the ambiguity.
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: wake-bot }
   template:

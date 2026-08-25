@@ -63,6 +63,30 @@ let a node drain. Those are the facts that decide whether the saving is real.
 what the operator last wrote, that is a person acting deliberately, and the
 window stands down until the next boundary rather than overriding them.
 
+## Working during a window
+
+Someone who needs the namespace back before the window ends does not have to
+be scaled up by hand, and nobody has to remember to put it away again:
+
+```yaml
+kind: WakeRequest
+spec:
+  duration: 3h
+  reason: "verifying a payment hotfix"
+```
+
+The window then reports `WakeRequested` rather than `Awake` — awake, and the
+reason why it is awake off-schedule — and goes back to sleep when the last
+request lapses.
+
+The split is deliberate. `IdleWindow` is policy and belongs to whoever runs the
+platform; a request to step around it belongs to whoever needs to work
+tonight. RBAC can then say exactly that: `create` on `wakerequests`, nothing on
+`idlewindows`. The cap lives on the policy object, so a request over
+`maxWakeDuration` is refused no matter what raised it.
+
+[`tools/slack-waker`](../../tools/slack-waker) is one such front end.
+
 ## What it will not do
 
 - **Remove nodes.** Emptying workloads is where this stops; taking the node
