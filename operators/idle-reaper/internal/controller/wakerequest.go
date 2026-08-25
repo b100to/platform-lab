@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -121,6 +122,18 @@ func (r *IdleWindowReconciler) recordWakeRequest(
 		req.Status.ExpiresAt = &t
 	}
 
+	// The outcome is also written as a condition. Whatever raised the request
+	// — a person with kubectl, a chat command — has to be able to find out
+	// what the cluster decided and why, and a phase alone does not say why a
+	// request was turned down.
+	meta.SetStatusCondition(&req.Status.Conditions, metav1.Condition{
+		Type:               finopsv1alpha1.ConditionAccepted,
+		Status:             acceptedStatus(phase),
+		Reason:             phase,
+		Message:            describeWakeOutcome(window, req, phase, expiresAt),
+		ObservedGeneration: req.Generation,
+	})
+
 	switch phase {
 	case finopsv1alpha1.WakePhaseActive:
 		r.event(window, corev1EventNormal, "WakeGranted",
@@ -134,4 +147,32 @@ func (r *IdleWindowReconciler) recordWakeRequest(
 	}
 
 	return ignoreConflict(r.Status().Update(ctx, req))
+}
+
+func acceptedStatus(phase string) metav1.ConditionStatus {
+	if phase == finopsv1alpha1.WakePhaseRejected {
+		return metav1.ConditionFalse
+	}
+	return metav1.ConditionTrue
+}
+
+// describeWakeOutcome explains a decision in terms the requester can act on.
+func describeWakeOutcome(
+	window *finopsv1alpha1.IdleWindow,
+	req *finopsv1alpha1.WakeRequest,
+	phase string,
+	expiresAt time.Time,
+) string {
+	switch phase {
+	case finopsv1alpha1.WakePhaseActive:
+		return "holding " + window.Namespace + " awake until " + expiresAt.Format(time.RFC3339)
+	case finopsv1alpha1.WakePhaseExpired:
+		return "expired; the schedule on " + window.Name + " applies again"
+	default:
+		if _, err := time.ParseDuration(req.Spec.Duration); err != nil {
+			return "duration " + req.Spec.Duration + " could not be parsed"
+		}
+		return "duration " + req.Spec.Duration + " exceeds the " +
+			window.Spec.MaxWakeDuration + " limit set by " + window.Name
+	}
 }

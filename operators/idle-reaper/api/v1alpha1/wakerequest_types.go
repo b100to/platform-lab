@@ -21,6 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// ConditionAccepted reports whether the cluster took the request, and when it
+// did not, why.
+const ConditionAccepted = "Accepted"
+
 // WakeRequest phases.
 const (
 	// WakePhaseActive means the request still holds its namespace awake.

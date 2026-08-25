@@ -59,8 +59,12 @@ func main() {
 		log.Fatalf("kubernetes client: %v", err)
 	}
 
-	api := slack.New(botToken, slack.OptionAppLevelToken(appToken))
-	client := socketmode.New(api)
+	debug := os.Getenv("SLACK_DEBUG") == "true"
+	api := slack.New(botToken,
+		slack.OptionAppLevelToken(appToken),
+		slack.OptionDebug(debug),
+	)
+	client := socketmode.New(api, socketmode.OptionDebug(debug))
 
 	go handleEvents(client, api, k8s, channels)
 
@@ -73,6 +77,7 @@ func main() {
 func handleEvents(client *socketmode.Client, api *slack.Client, k8s dynamic.Interface, channels map[string]string) {
 	for evt := range client.Events {
 		if evt.Type != socketmode.EventTypeSlashCommand {
+			log.Printf("event: %s", evt.Type)
 			continue
 		}
 		cmd, ok := evt.Data.(slack.SlashCommand)
@@ -141,9 +146,68 @@ func handleWake(
 		return describeCreateError(namespace, err)
 	}
 
-	return fmt.Sprintf(
-		":white_check_mark: `%s` will stay awake for *%s*.\nRequest `%s` — it expires on its own, nothing to undo.\nReason: _%s_",
-		namespace, duration, created.GetName(), reason)
+	// Creating the object is not the same as it being accepted. The API server
+	// checks the shape; whether the duration is allowed is the controller's
+	// call, and it makes it a moment later. Reporting success on create means
+	// telling someone their namespace is awake when it is about to be
+	// refused — so wait for the verdict and repeat that instead.
+	return awaitVerdict(ctx, k8s, namespace, created.GetName(), duration, reason)
+}
+
+// awaitVerdict waits briefly for the controller to rule on a request.
+//
+// Slack's three-second acknowledgement has already been sent by the time this
+// runs, and the reply goes back over the response URL, so there is room to
+// wait. The window is short anyway: if no verdict arrives, saying so is more
+// honest than guessing.
+func awaitVerdict(ctx context.Context, k8s dynamic.Interface, namespace, name, duration, reason string) string {
+	const (
+		timeout  = 5 * time.Second
+		interval = 250 * time.Millisecond
+	)
+
+	deadline := time.Now().Add(timeout)
+	for {
+		obj, err := k8s.Resource(wakeRequestGVR).Namespace(namespace).
+			Get(ctx, name, metav1.GetOptions{})
+		if err == nil {
+			phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
+			switch phase {
+			case "Active":
+				expiry, _, _ := unstructured.NestedString(obj.Object, "status", "expiresAt")
+				return fmt.Sprintf(
+					":white_check_mark: `%s` is awake for *%s* (until %s).\n"+
+						"Request `%s` expires on its own — nothing to undo.\nReason: _%s_",
+					namespace, duration, expiry, name, reason)
+			case "Rejected":
+				return fmt.Sprintf(":no_entry: request refused — %s", verdictMessage(obj)) +
+					"\nRequest `" + name + "` is kept so the refusal is on the record."
+			}
+		}
+
+		if time.Now().After(deadline) {
+			return fmt.Sprintf(
+				":hourglass: `%s` was raised in `%s` but has not been ruled on yet.\n"+
+					"Check with `kubectl get wakerequest %s -n %s`.",
+				name, namespace, name, namespace)
+		}
+		time.Sleep(interval)
+	}
+}
+
+// verdictMessage pulls the controller's explanation out of the object.
+func verdictMessage(obj *unstructured.Unstructured) string {
+	conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
+	for _, raw := range conditions {
+		cond, ok := raw.(map[string]any)
+		if !ok || cond["type"] != "Accepted" {
+			continue
+		}
+		if msg, ok := cond["message"].(string); ok && msg != "" {
+			return msg
+		}
+	}
+	return "the cluster did not accept it"
 }
 
 // parseCommand splits "3h deploying a hotfix" into its duration and reason.
