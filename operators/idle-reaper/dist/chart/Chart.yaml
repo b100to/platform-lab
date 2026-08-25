@@ -1,14 +1,33 @@
 apiVersion: v2
 name: idle-reaper
-description: A Helm chart to distribute idle-reaper
+description: |
+  Declares when a namespace is idle, scales its workloads down while it is,
+  and reports which workload or PodDisruptionBudget is keeping a node from
+  being removed.
 type: application
 
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.1.1
+appVersion: "0.1.1"
+
+home: https://github.com/b100to/platform-lab/tree/main/operators/idle-reaper
+sources:
+  - https://github.com/b100to/platform-lab
 
 keywords:
   - kubernetes
   - operator
+  - finops
+  - cost-optimization
+  - autoscaling
+
+maintainers:
+  - name: b100to
+    url: https://github.com/b100to
 
 annotations:
   kubebuilder.io/generated-by: kubebuilder
+  # Artifact Hub reads these if the repository is ever listed there.
+  artifacthub.io/category: integration-delivery
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/operator: "true"
+  artifacthub.io/prerelease: "true"

@@ -91,8 +91,12 @@ model, including the sensitivity of its most load-bearing assumption.
 
 ```sh
 helm install idle-reaper oci://ghcr.io/b100to/charts/idle-reaper \
+  --version 0.1.1 \
   --namespace idle-reaper-system --create-namespace
 ```
+
+The chart carries the CRD and keeps it on uninstall, so removing the operator
+never deletes the windows people wrote.
 
 Two settings matter on a real cluster:
 
