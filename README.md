@@ -1,17 +1,16 @@
 # platform-lab
 
-Local Kubernetes workshop — a 4-node [kind](https://kind.sigs.k8s.io) cluster
-plus whatever I am currently building or testing against it.
+**[idle-reaper](operators/idle-reaper)** is the thing worth reading here: a
+Kubernetes operator that declares when a namespace is idle, scales its
+workloads down while it is, and reports which workload or PodDisruptionBudget
+is keeping a node from being removed — because emptying pods on a node that
+stays running saves nothing.
 
-Not a curated portfolio. Things land here when I need somewhere to run them —
-except the first one, which outgrew that.
+The rest is the workshop it was built in: a 4-node
+[kind](https://kind.sigs.k8s.io) cluster, fixtures to scale, and a Slack
+front end. Things land here when I need somewhere to run them.
 
 ## idle-reaper
-
-An operator that declares when a namespace is idle, scales its workloads down
-while it is, and reports which workload or PodDisruptionBudget is keeping a
-node from being removed — because emptying pods on a node that stays running
-saves nothing.
 
 ```sh
 make lab-install     # CRD and test workloads
