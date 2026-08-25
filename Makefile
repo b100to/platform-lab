@@ -8,6 +8,7 @@ OPERATOR ?= operators/idle-reaper
 METRICS  ?= 18090
 HEALTH   ?= 18091
 IMG      ?= idle-reaper:dev
+RELEASE_IMG ?= ghcr.io/b100to/idle-reaper
 OPERATOR_NS ?= idle-reaper-system
 
 .PHONY: help up down status nodes kill-node revive-node scan \
@@ -116,6 +117,11 @@ lab-chart: ## Regenerate the Helm chart from the kustomize output
 	@# Artifact Hub renders the README from inside the chart package, so it has
 	@# to survive regeneration too.
 	@cp /tmp/idle-reaper-chart-README.md $(OPERATOR)/dist/chart/README.md
+	@# The plugin writes kubebuilder's placeholder image into values.yaml. A
+	@# chart whose default image does not exist fails on install for everyone
+	@# but us, and Artifact Hub reports it as an unscannable image.
+	@sed -i '' 's|^    repository: controller$$|    repository: $(RELEASE_IMG)|' \
+		$(OPERATOR)/dist/chart/values.yaml
 
 lab-image: ## Build the controller image and load it into the kind nodes
 	cd $(OPERATOR) && docker build -t $(IMG) .

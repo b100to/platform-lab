@@ -6,8 +6,8 @@ description: |
   being removed.
 type: application
 
-version: 0.1.3
-appVersion: "0.1.3"
+version: 0.1.4
+appVersion: "0.1.4"
 
 icon: https://raw.githubusercontent.com/b100to/platform-lab/main/operators/idle-reaper/icon.svg
 home: https://github.com/b100to/platform-lab/tree/main/operators/idle-reaper

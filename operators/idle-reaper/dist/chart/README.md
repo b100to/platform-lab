@@ -69,7 +69,7 @@ manager:
 | Key | Default | What |
 |---|---|---|
 | `manager.replicas` | `1` | Controller replicas |
-| `manager.image.repository` | `controller` | Image to run |
+| `manager.image.repository` | `ghcr.io/b100to/idle-reaper` | Image to run |
 | `manager.args` | `["--leader-elect"]` | Extra flags, appended to metrics and health args |
 | `manager.nodeSelector` | `{}` | Where the controller runs |
 | `manager.tolerations` | `[]` | Taints it may run on |
