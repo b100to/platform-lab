@@ -92,6 +92,19 @@ spec:
                 - Warn
                 - Scale
                 type: string
+              maxWakeDuration:
+                default: 8h
+                description: |-
+                  maxWakeDuration caps how long a single WakeRequest may hold this
+                  namespace awake. Requests asking for more are rejected.
+
+                  The cap lives here, on the policy object, rather than in whatever front
+                  end raises requests. A Slack command or a portal is a client of this
+                  API, and a client is the wrong place to enforce a limit: the API server
+                  has to be the thing that says no, or the limit only holds while the
+                  client behaves.
+                pattern: ^([0-9]+(\.[0-9]+)?(s|m|h))+$
+                type: string
               minReplicas:
                 default: 0
                 description: |-
@@ -190,6 +203,12 @@ spec:
           status:
             description: status defines the observed state of IdleWindow
             properties:
+              activeWakeRequests:
+                description: |-
+                  activeWakeRequests counts the requests currently holding this namespace
+                  awake, so a window that is awake off-schedule says why.
+                format: int32
+                type: integer
               affectedWorkloads:
                 description: |-
                   affectedWorkloads counts the Deployments this window currently holds
@@ -319,6 +338,183 @@ spec:
                   drainableNodes can be read as a fraction rather than a bare count.
                 format: int32
                 type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: wakerequests.finops.b100to.dev
+spec:
+  group: finops.b100to.dev
+  names:
+    kind: WakeRequest
+    listKind: WakeRequestList
+    plural: wakerequests
+    shortNames:
+    - wr
+    singular: wakerequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.duration
+      name: For
+      type: string
+    - jsonPath: .status.expiresAt
+      name: Expires
+      type: string
+    - jsonPath: .spec.reason
+      name: Reason
+      type: string
+    - jsonPath: .spec.requestedBy
+      name: By
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: WakeRequest is the Schema for the wakerequests API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of WakeRequest
+            properties:
+              duration:
+                description: |-
+                  duration is how long the namespace should stay awake, as a Go duration
+                  ("3h", "90m").
+
+                  A duration rather than an end time on purpose: nobody should be asked
+                  to work out a UTC timestamp at two in the morning. It is also what
+                  makes the request self-cancelling — the expiry is derived, so there is
+                  nothing for a person to remember to undo.
+                pattern: ^([0-9]+(\.[0-9]+)?(s|m|h))+$
+                type: string
+              reason:
+                description: |-
+                  reason is why the window is being lifted. Required, because a namespace
+                  waking up at 3am with no explanation is exactly the thing someone will
+                  want explained later — and repeated reasons are themselves a cost
+                  signal about how a team works.
+                maxLength: 200
+                minLength: 3
+                type: string
+              requestedBy:
+                description: |-
+                  requestedBy names the person this was raised for. A front end that
+                  creates requests on someone's behalf should fill it in; it is a label
+                  for humans reading the object, not an authorization input, and the
+                  audit trail that counts is the API server's own.
+                type: string
+            required:
+            - duration
+            - reason
+            type: object
+          status:
+            description: status defines the observed state of WakeRequest
+            properties:
+              conditions:
+                description: conditions carry why a request was rejected.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              expiresAt:
+                description: |-
+                  expiresAt is when this request stops holding the namespace awake.
+                  Derived from the creation time and duration rather than supplied, so
+                  editing it after the fact does not extend the exception.
+                format: date-time
+                type: string
+              phase:
+                description: phase is Active, Expired, or Rejected.
+                type: string
+              window:
+                description: window names the IdleWindow this request applies to.
+                type: string
             type: object
         required:
         - spec
@@ -510,10 +706,19 @@ rules:
   - finops.b100to.dev
   resources:
   - idlewindows/status
+  - wakerequests/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - policy
   resources:
@@ -548,6 +753,77 @@ metadata:
 rules:
 - nonResourceURLs:
   - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-wakerequest-admin-role
+rules:
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests
+  verbs:
+  - '*'
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-wakerequest-editor-role
+rules:
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: idle-reaper
+  name: idle-reaper-wakerequest-viewer-role
+rules:
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - finops.b100to.dev
+  resources:
+  - wakerequests/status
   verbs:
   - get
 ---

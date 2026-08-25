@@ -44,6 +44,22 @@
 - **kind 의 kubeadm 설정은 `v1beta3`** 이다. `extraArgs` 를 v1beta4 의 리스트
   형식으로 쓰면 `cannot unmarshal array into Go struct field` 로 실패한다. 맵으로 쓸 것.
 
+## Helm 차트 관련 (겪은 것)
+
+- **`make manifests` 는 `dist/chart` 를 갱신하지 않는다.** RBAC 마커를 고쳐도
+  차트는 옛 권한을 그대로 담고 있고, 증상은 클러스터에서만 나타난다 —
+  컨트롤러는 뜨는데 권한 없는 리소스를 watch 하지 못한다.
+  `make lab-chart` 로 재생성한다 (`lab-deploy` 가 자동 호출).
+- **`make install`(kustomize)로 CRD 를 먼저 깔면 Helm 이 그걸 인수하지 못한다.**
+  `invalid ownership metadata` 로 upgrade 가 실패한다. CRD 를 지우면 그 안의
+  오브젝트도 사라지므로, 라벨·어노테이션을 붙여 입양시키는 편이 낫다.
+  ```
+  kubectl label crd <name> app.kubernetes.io/managed-by=Helm --overwrite
+  kubectl annotate crd <name> meta.helm.sh/release-name=idle-reaper \
+    meta.helm.sh/release-namespace=idle-reaper-system --overwrite
+  ```
+- **차트 재생성은 Chart.yaml 을 템플릿 문구로 되돌린다.** `lab-chart` 가 백업·복원한다.
+
 ## 보안 — public 레포다
 
 - **회사 정보 일절 금지**: 내부 도메인, 계정 ID, 아키텍처 세부, 비용 수치

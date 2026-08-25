@@ -12,7 +12,7 @@ OPERATOR_NS ?= idle-reaper-system
 
 .PHONY: help up down status nodes kill-node revive-node scan \
         lab-install lab-run lab-sleep lab-wake lab-status lab-metrics lab-reset \
-        lab-image lab-deploy lab-undeploy
+        lab-chart lab-image lab-deploy lab-undeploy
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -101,11 +101,23 @@ lab-metrics: ## Scrape the controller's own metrics
 	@curl -s --max-time 5 http://localhost:$(METRICS)/metrics | grep -E '^idlereaper' | sort \
 		|| echo "no metrics -- is 'make lab-run' running?"
 
+lab-chart: ## Regenerate the Helm chart from the kustomize output
+	@# make manifests updates config/, not dist/chart. Skipping this step
+	@# ships a chart whose RBAC predates the last API change, and the symptom
+	@# only appears in the cluster: the controller starts, then fails to watch
+	@# a resource it has no permission to list.
+	@cp $(OPERATOR)/dist/chart/Chart.yaml /tmp/idle-reaper-Chart.yaml
+	$(MAKE) -C $(OPERATOR) manifests
+	cd $(OPERATOR) && kubebuilder edit --plugins=helm/v2-alpha
+	@# The plugin rewrites Chart.yaml with its template text, so the real
+	@# description, sources and maintainers are put back.
+	@cp /tmp/idle-reaper-Chart.yaml $(OPERATOR)/dist/chart/Chart.yaml
+
 lab-image: ## Build the controller image and load it into the kind nodes
 	cd $(OPERATOR) && docker build -t $(IMG) .
 	kind load docker-image $(IMG) --name $(CLUSTER)
 
-lab-deploy: lab-image ## Install the operator into the cluster with Helm
+lab-deploy: lab-chart lab-image ## Install the operator into the cluster with Helm
 	helm upgrade --install idle-reaper $(OPERATOR)/dist/chart \
 		-n $(OPERATOR_NS) --create-namespace \
 		-f platform/idle-reaper/values-lab.yaml
