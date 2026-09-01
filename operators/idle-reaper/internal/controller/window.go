@@ -104,3 +104,14 @@ func requeueAfter(now, next time.Time) time.Duration {
 		return d
 	}
 }
+
+// nextOccurrence is the next time a cron expression fires after now. It exists
+// so tests can show the two boundaries the decision is made from.
+func nextOccurrence(expr string, now time.Time) (time.Time, error) {
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	sched, err := parser.Parse(expr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return sched.Next(now), nil
+}

@@ -66,7 +66,15 @@
 - 시크릿 커밋 차단: `git config core.hooksPath .githooks` (gitleaks pre-commit)
 - 커밋 전 `make scan`
 
+## 개발 로그
+
+문제·의사결정은 [`docs/devlog.md`](../docs/devlog.md) 에 기록한다.
+트리거·형식·원칙은 글로벌 `~/.claude/CLAUDE.md` §8 (개발 로그) 참조 — 여기 복제하지 않는다.
+
+이 레포는 public 이고 포트폴리오로 쓴다. devlog 도 **회사에 종속되지 않는 일반 기술 문제**로 서술한다.
+
 ## 문서 언어
 
 - `README.md` — 영문
 - 이 파일 및 내부 메모 — 한국어
+- `docs/devlog.md` — 한국어
