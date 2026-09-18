@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="292" viewBox="0 0 920 292" role="img" aria-label="전환 전에는 Istio gateway, pod마다 sidecar, istiod가 있었고 전환 후에는 ALB, Traefik, 앱만 있는 pod">
+<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M1.5 1.2 L6.8 4 L1.5 6.8" fill="none" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="920" height="292" fill="#FFFFFF"/>
+<text x="24" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">전환 전 · 서비스 메시</text>
+<rect x="24" y="100" width="64" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="56.0" y="131.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">ALB</text>
+<line x1="92" y1="126" x2="108" y2="126" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="112" y="100" width="110" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="167.0" y="123.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">Gateway</text>
+<text x="167.0" y="141.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">Istio · Envoy</text>
+<line x1="226" y1="126" x2="242" y2="126" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="246" y="62" width="202" height="58" rx="3" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+<text x="254" y="78" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="start">pod</text>
+<rect x="254" y="84" width="86" height="28" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="297" y="103" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13.5" font-weight="600" fill="#111827" text-anchor="middle">app</text>
+<rect x="346" y="84" width="94" height="28" rx="3" fill="#F3F4F6" stroke="#6B7280" stroke-width="1"/>
+<text x="393" y="103" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13.5" font-weight="400" fill="#374151" text-anchor="middle">sidecar</text>
+<rect x="246" y="132" width="202" height="58" rx="3" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+<text x="254" y="148" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="start">pod</text>
+<rect x="254" y="154" width="86" height="28" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="297" y="173" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13.5" font-weight="600" fill="#111827" text-anchor="middle">app</text>
+<rect x="346" y="154" width="94" height="28" rx="3" fill="#F3F4F6" stroke="#6B7280" stroke-width="1"/>
+<text x="393" y="173" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13.5" font-weight="400" fill="#374151" text-anchor="middle">sidecar</text>
+<rect x="112" y="172" width="110" height="34" rx="3" fill="#F3F4F6" stroke="#111827" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="167.0" y="194.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">istiod</text>
+<line x1="222" y1="189" x2="242" y2="176" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+<text x="24" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">알아야 할 것</text>
+<text x="108" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="400" fill="#374151" text-anchor="start">Kubernetes → Istio → Envoy</text>
+<line x1="460" y1="24" x2="460" y2="238" stroke="#D1D5DB" stroke-width="1" stroke-linecap="round"/>
+<text x="472" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#1F3A5F" text-anchor="start">전환 후 · 인그레스</text>
+<rect x="472" y="100" width="64" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="504.0" y="131.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">ALB</text>
+<line x1="540" y1="126" x2="556" y2="126" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="560" y="100" width="110" height="52" rx="3" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.5"/>
+<text x="615.0" y="123.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#1F3A5F" text-anchor="middle">Traefik</text>
+<text x="615.0" y="141.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">L7 라우팅</text>
+<line x1="674" y1="126" x2="690" y2="126" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="694" y="62" width="202" height="58" rx="3" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+<text x="702" y="78" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="start">pod</text>
+<rect x="702" y="84" width="186" height="28" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="795" y="103" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13.5" font-weight="600" fill="#111827" text-anchor="middle">app</text>
+<rect x="694" y="132" width="202" height="58" rx="3" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+<text x="702" y="148" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="start">pod</text>
+<rect x="702" y="154" width="186" height="28" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="795" y="173" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13.5" font-weight="600" fill="#111827" text-anchor="middle">app</text>
+<text x="472" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">알아야 할 것</text>
+<text x="556" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#1F3A5F" text-anchor="start">Kubernetes → CRD 두 종류</text>
+<line x1="24" y1="250" x2="896" y2="250" stroke="#D1D5DB" stroke-width="1" stroke-linecap="round"/>
+<text x="24" y="276" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">공개 스냅샷의 명시적 Istio 선언</text>
+<text x="232" y="276" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="start">Gateway 4  ·  VirtualService 4  ·  mTLS · 인가 · 트래픽 정책 0</text>
+</svg>

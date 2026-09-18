@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="312" viewBox="0 0 920 312" role="img" aria-label="입사 시점에는 Terraform 저장소와 manifest 저장소, 환경 브랜치 셋이 있었고 현재는 모노레포 하나에서 인프라 흐름과 배포 흐름이 나뉜다">
+<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M1.5 1.2 L6.8 4 L1.5 6.8" fill="none" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="920" height="312" fill="#FFFFFF"/>
+<text x="24" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">입사 시점 · 저장소 둘</text>
+<rect x="24" y="56" width="276" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="162.0" y="79.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">Terraform repo</text>
+<text x="162.0" y="97.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">Terraform Cloud · workspace</text>
+<rect x="24" y="118" width="276" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="162.0" y="141.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">Manifest repo</text>
+<text x="162.0" y="159.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">서비스별 Helm chart</text>
+<text x="24" y="196" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">환경 브랜치  dev / stage / prod 를 맞춰야 함</text>
+<text x="24" y="216" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">연결된 변경 하나 = PR 두 개</text>
+<line x1="314" y1="113" x2="340" y2="113" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="356" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#1F3A5F" text-anchor="start">현재 · GitOps 모노레포</text>
+<text x="356" y="87" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#111827" text-anchor="start">인프라</text>
+<rect x="412" y="56" width="148" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="486.0" y="79.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">modules/</text>
+<text x="486.0" y="97.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">생성 규칙</text>
+<line x1="563" y1="82" x2="575" y2="82" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="578" y="56" width="148" height="52" rx="3" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.5"/>
+<text x="652.0" y="79.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#1F3A5F" text-anchor="middle">stacks/…/&lt;env&gt;</text>
+<text x="652.0" y="97.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">환경 = leaf 디렉터리</text>
+<line x1="729" y1="82" x2="741" y2="82" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="744" y="56" width="148" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="818.0" y="79.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">AWS · EKS</text>
+<text x="818.0" y="97.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">CI가 plan · apply</text>
+<text x="356" y="149" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#111827" text-anchor="start">배포</text>
+<rect x="412" y="118" width="148" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="486.0" y="141.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">chart + values</text>
+<text x="486.0" y="159.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">공통 골격 + 차이</text>
+<line x1="563" y1="144" x2="575" y2="144" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="578" y="118" width="148" height="52" rx="3" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.5"/>
+<text x="652.0" y="141.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#1F3A5F" text-anchor="middle">Argo CD</text>
+<text x="652.0" y="159.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">Application</text>
+<line x1="729" y1="144" x2="741" y2="144" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="744" y="118" width="148" height="52" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="818.0" y="141.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="middle">Kubernetes</text>
+<text x="818.0" y="159.0" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">워크로드</text>
+<text x="356" y="196" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">main + feature 브랜치. 환경은 브랜치가 아니라 디렉터리와 stack tag.</text>
+<text x="356" y="216" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">한 앱의 예외는 values에, 여러 소비자의 계약은 chart와 module에.</text>
+<line x1="24" y1="238" x2="896" y2="238" stroke="#D1D5DB" stroke-width="1" stroke-linecap="round"/>
+<text x="24" y="272" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="21" font-weight="600" fill="#1F3A5F" text-anchor="start">39 → 1</text>
+<text x="24" y="294" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">손으로 쓴 backend 선언</text>
+<text x="324" y="272" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="21" font-weight="600" fill="#1F3A5F" text-anchor="start">59 → 0</text>
+<text x="324" y="294" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">terraform_remote_state 참조</text>
+<text x="624" y="272" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="21" font-weight="600" fill="#1F3A5F" text-anchor="start">7 → 1</text>
+<text x="624" y="294" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">AWS provider 버전 제약의 종류</text>
+</svg>
