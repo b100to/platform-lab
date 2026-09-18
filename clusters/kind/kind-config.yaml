@@ -4,22 +4,22 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: lab
 
-# Two workarounds for running a control plane on macOS, where the container
-# filesystem makes etcd fsync slow enough (200ms+, spiking past 700ms) that
-# lease renewals time out and kube-controller-manager crash-loops on
-# "leaderelection lost".
+# Leader election off. On macOS the container filesystem made etcd fsync slow
+# enough (200ms+, spiking past 700ms) that lease renewals timed out and
+# kube-controller-manager crash-looped on "leaderelection lost". With a single
+# control plane there is nothing to elect against, so the lease was pure
+# overhead and a failure mode.
 #
-#   1. etcd on /tmp, which kind mounts as tmpfs -> writes stay in RAM.
-#      Trade-off: restarting the control-plane container wipes cluster state.
-#      Acceptable here because everything is reapplied from this repo.
-#   2. Leader election off. With a single control-plane there is nothing to
-#      elect against, so the lease is pure overhead and a failure mode.
+# etcd used to be moved to /tmp (tmpfs) as a second workaround for the same
+# symptom. It is gone: measured against this config, disk-backed etcd logs no
+# slow-fsync warnings and no component restarts, so tmpfs bought nothing while
+# costing the whole cluster on every container restart -- kindnet, kube-proxy,
+# coredns and the kubeadm:cluster-admins binding live in etcd and are written
+# only at cluster creation, so no amount of reapplying this repo brings them
+# back. See docs/devlog.md.
 kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
-    etcd:
-      local:
-        dataDir: /tmp/etcd
     controllerManager:
       extraArgs:
         leader-elect: "false"

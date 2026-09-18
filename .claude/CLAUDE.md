@@ -28,12 +28,24 @@
   kube-controller-manager / kube-scheduler 가 `leaderelection lost` 로
   CrashLoopBackOff 에 빠진다. 증상은 **"Deployment 를 만들어도 파드가 안 뜬다"** —
   ReplicaSet 컨트롤러가 controller-manager 안에 있기 때문이다.
-  `clusters/kind/kind-config.yaml` 에서 두 가지로 해결했다.
-    1. etcd dataDir 을 `/tmp/etcd` 로. kind 노드는 `/tmp` 가 tmpfs 라 RAM 에 쓴다
-       → **컨트롤플레인 컨테이너를 재시작하면 클러스터 상태가 날아간다.**
-       레포에서 전부 재적용하므로 감수한다
-    2. 컨트롤플레인이 하나뿐이라 leader election 을 끈다 (`leader-elect: false`)
-  적용 후 etcd 지연 경고 96회 → 1회, 노드 Ready 까지 7분 → 1분.
+  해결은 `clusters/kind/kind-config.yaml` 의 `leader-elect: false` 하나다.
+  컨트롤플레인이 하나뿐이라 lease 는 순수 오버헤드이자 실패 지점일 뿐이다.
+- **etcd 를 tmpfs(`/tmp/etcd`)로 옮기는 건 하지 말 것.** 위 증상의 두 번째
+  워크어라운드로 넣었다가 뺐다. 실측하면 디스크 etcd 도 slow-fsync 경고 0회,
+  컴포넌트 재시작 0회 — tmpfs 는 얻는 게 없었다. 대신 **컨테이너가 재시작될
+  때마다(OrbStack 재시작 포함) 클러스터가 통째로 날아간다.** 그리고 이건
+  "레포에서 재적용하면 된다"로 감수할 수 있는 손실이 아니다. 다음 셋은 kind 가
+  **클러스터 생성 시에만** etcd 에 쓰는 것들이라 `make lab-install` 로 못 되돌린다:
+    1. ClusterRoleBinding `kubeadm:cluster-admins` → 모든 kubectl 이 `Forbidden`.
+       인증 문제처럼 보이지만 아니다. 복구는 컨트롤플레인 안에서
+       `kubectl --kubeconfig /etc/kubernetes/super-admin.conf` 로 바인딩 재생성
+    2. kindnet / kube-proxy / coredns → ClusterIP·DNS·노드간 통신 사망.
+       CNI 설정 파일은 노드 디스크에 남아서 **파드는 IP 를 받고 Running 으로
+       보인다.** 증상은 컨트롤러가 `10.96.0.1:443` 타임아웃 나는 것으로 나타난다
+    3. control-plane 의 `node-role.kubernetes.io/control-plane` 라벨과 NoSchedule
+       taint → 워크로드가 컨트롤플레인으로 몰린다. kubeadm 의 mark-control-plane
+       단계가 Node 오브젝트에 직접 쓰는 것이라 kubelet 재등록으로는 안 붙는다
+  이 상태가 되면 손으로 깁지 말고 `make down && make up` 후 재배포한다.
 - **kind config 의 `labels:` 로 `node-role.kubernetes.io/*` 를 붙이면 노드가 안 뜬다.**
   이 라벨은 kubelet 이 등록 시 자기에게 붙이는데, NodeRestriction admission 이
   그 접두사를 거부한다. 등록이 실패하면 join 이
