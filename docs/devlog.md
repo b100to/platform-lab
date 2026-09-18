@@ -180,3 +180,81 @@ kubeadm 이 만든 RBAC 바인딩 — 는 어떤 GitOps 레포에도 들어있�
 그와 별개로 죽어 있을 수 있다.
 
 ---
+
+## 강제 분산(`DoNotSchedule`)은 장애 중 복구를 막을 수 있다 — `nodeTaintsPolicy` 를 재현으로 확인  (2026-09-18)
+
+### Problem
+
+노드 장애에 대비해 같은 앱의 replica 를 노드별로 강제 분산(hostname,
+`whenUnsatisfiable: DoNotSchedule`)하는 설계를 문서로 정리하던 중이었다.
+`nodeTaintsPolicy: Honor` 가 필요한 이유는 "replica 3 부터 Pending 이 난다"는
+한 가지로만 알고 있었다. 그런데 같은 논리를 따라가면 **노드가 죽어 있는 동안**에도
+같은 일이 벌어져야 했다. 문서에 쓰기 전에 실제로 그런지 확인이 필요했다.
+
+### Expected
+
+NotReady 노드에는 `node.kubernetes.io/not-ready:NoSchedule` taint 가 붙는다.
+기본값 `Ignore` 는 taint 노드도 분산 도메인으로 센다. 그렇다면 죽은 노드가
+"0개짜리 도메인"으로 남아, 살아 있는 노드에 대체 pod 을 올리는 것이
+`maxSkew` 위반이 되어야 한다.
+
+### Cause
+
+스케줄러는 분산 도메인을 셀 때 "이 pod 이 갈 수 있는 노드인가"를
+`nodeTaintsPolicy` 로만 판단한다. 이 lab 은 taint 걸린 infra 노드 1대 + app 노드
+2대라, 전용 NodePool 에 taint 를 거는 운영 클러스터와 같은 모양이다.
+`scripts/topology-spread-repro.sh` 로 `nodeTaintsPolicy` 만 다른 Deployment 두 개를
+나란히 돌렸다.
+
+| 실험 | `Ignore` (기본값) | `Honor` |
+|---|---|---|
+| A. replica 3, app 노드 2대 | 1개 Pending | 2:1 |
+| B-1. replica 2, 한 노드를 unschedulable 로 만들고 그 pod 삭제 | 대체 pod Pending | 생존 노드에 Running |
+| B-2. 노드 복귀 | 1:1 | **2:0 그대로** |
+
+A 의 Pending 메시지:
+`2 node(s) didn't match pod topology spread constraints, 2 node(s) had untolerated taint(s)`
+
+### Attempts
+
+- 실제 노드 정지(`make kill-node`) 대신 tolerate 하지 않는 `NoSchedule` taint 로
+  대체했다. 스케줄러가 보는 조건은 같고, 다른 lab 워크로드를 건드리지 않으며,
+  실패해도 `trap` 으로 taint 를 지우면 끝난다. NotReady 의 `NoExecute` 쪽
+  (300초 뒤 eviction)은 이 실험의 질문이 아니라서 pod 을 직접 삭제했다.
+- 처음엔 명령을 셸 변수(`K="kubectl --context ..."`)에 담았다가 zsh 가 공백을
+  쪼개지 않아 전부 `command not found` 가 났다. 함수로 바꾸니 `k` alias 와 충돌했다.
+  bash 스크립트 파일로 옮겨서 해결했다.
+- 파일 개수를 `ls` 로 세었다가 `ls` 가 eza alias 라 출력이 파일명으로 파싱되지
+  않았다. 카운트가 전부 0 으로 나왔고, `find` 로 다시 셌다.
+
+### Decision
+
+문서에는 `Honor` 의 효과를 둘로 나눠 적었다: 유령 도메인 제거, 장애 중 복구 허용.
+그리고 B-2 를 Descheduler 가 필요한 근거로 연결했다.
+
+### Why
+
+B-1 과 B-2 는 한 쌍이다. `Honor` 는 장애 중 용량을 지키는 대신 복귀 뒤 쏠림을
+남긴다. TSC 는 스케줄 시점에만 작동하므로 아무도 그 pod 을 옮기지 않는다.
+"TSC 를 강제로 걸었으니 Descheduler 는 없어도 된다"도, "Descheduler 가 있으니
+`Honor` 는 없어도 된다"도 틀렸다는 것을 같은 실험이 보여준다.
+
+### Result
+
+세 실험 모두 예상대로 재현됐다. 스크립트는 종료 시 taint 와 namespace 를 지우며,
+실행 뒤 `lab-worker3` 의 taint 가 비어 있는 것을 확인했다.
+Descheduler 의 evict 동작은 재현하지 않았다.
+
+### What I Learned
+
+**가용성을 위한 강제 제약은 장애 상황에서 거꾸로 작동하는지 따로 확인해야 한다.**
+`DoNotSchedule` 은 평시의 쏠림을 막지만, `Ignore` 와 만나면 장애 중에는
+"분산할 수 없으니 띄우지 않는다"가 된다. 평시 테스트로는 보이지 않는다.
+
+**replica 2 로 하는 테스트는 분산 설정을 검증하지 못한다.** 1:1 에서 멈추므로
+유령 도메인이 있어도 skew 가 1 을 넘지 않는다. 3 부터 드러난다.
+
+**출력을 파싱하기 전에 그 명령이 alias 인지 본다.** 0 이라는 숫자는 에러처럼
+보이지 않는다.
+
+---
