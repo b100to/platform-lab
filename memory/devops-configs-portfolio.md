@@ -8,3 +8,5 @@
 - Terraform Cloud를 떠난 이유는 셋이다: 유료화에 따른 추가 비용, `dev`·`stage`·`prod` 환경 브랜치를 맞춰야 하는 번거로움, 환경이 `terraform.workspace` 이름 안에 숨는 구조. 상세는 정본 4절 첫 소절을 따른다.
 - Terramate 선택의 우선 기준은 팀 가독성·온보딩·단순성이며, DRY와 확장성, 지속적인 업데이트, Terramate Cloud의 stack·drift 가시성이 판단을 뒷받침했다. 상세 비교는 정본 4절을 따른다.
 - 정본: [GitOps 저장소 아키텍처와 공통화 설계](../docs/devops-configs-architecture.md)
+- 제출용 요약: [DevOps 포트폴리오](../docs/devops-portfolio.md). 채용 제출본은 전후 비교 그림·짧은 선택 이유 표·핵심 결과 한 줄을 중심으로 구성한다. 문단이나 표 셀에 긴 설명을 옮겨 담지 않으며, 상세 설정은 원문 링크로 연결한다. 도구별 선택 이유를 반드시 남기며 실측하지 않은 성과는 만들지 않는다.
+- 전달본은 [단일 PDF](../output/pdf/devops-portfolio.pdf): 앞 5쪽 요약 + 상세 문서 4개 부록, 내부 목차 링크로 이동한다. Markdown을 정본으로 유지하고 [생성 스크립트](../tools/build_devops_portfolio_pdf.py)로 재생성한다. 성과 수치는 주석·실험 코드·bootstrap 포함 여부를 정하고 실제 선언을 집계한다.

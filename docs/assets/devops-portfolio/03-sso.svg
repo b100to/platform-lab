@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">도구별 계정에서 Authentik 기반 인증 연동으로</title>
+  <desc id="desc">이전의 도구별 계정과 장기 access key를 Google 계정 및 Authentik 인증 연동으로 전환한다. 운영 도구는 OIDC 또는 OAuth, 인증 없는 도구는 oauth2-proxy, AWS 콘솔은 SAML, CLI는 OIDC로 연동한다. Git Blueprint 설정은 Argo CD를 거쳐 Authentik에 반영한다. 화살표는 인증 연동과 설정 경로이며 모든 서비스 트래픽의 경로가 아니다.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#64748b" stroke-width="1.6"/></marker></defs>
+  <style>text{font-family:'Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif;fill:#172b46}.title{font-size:28px;font-weight:700}.label{font-size:24px;font-weight:700}.body{font-size:22px}.small{font-size:20px;fill:#52647b}.line{fill:none;stroke:#64748b;stroke-width:2.5;marker-end:url(#arrow)}.config{fill:none;stroke:#637cb1;stroke-width:2.5;stroke-dasharray:7 5;marker-end:url(#arrow)}</style>
+  <rect width="1200" height="560" rx="18" fill="#fff"/>
+  <text x="30" y="43" class="title">03  SSO · 계정은 통합하고 연동 방식은 앱에 맞게</text>
+  <rect x="24" y="78" width="237" height="446" rx="16" fill="#f4f5f7" stroke="#dce2e9"/>
+  <text x="44" y="116" class="label">이전 · 개별 관리</text>
+  <rect x="43" y="150" width="198" height="108" rx="12" fill="#fff" stroke="#cbd5e1"/>
+  <text x="62" y="190" class="body">도구별 계정</text><text x="62" y="227" class="small">생성 · 삭제 반복</text>
+  <rect x="43" y="283" width="198" height="108" rx="12" fill="#fff" stroke="#cbd5e1"/>
+  <text x="62" y="323" class="body">AWS IAM User</text><text x="62" y="360" class="small">장기 access key</text>
+  <text x="44" y="478" class="small">도구마다 다른 접근 관리</text>
+  <text x="289" y="116" class="label">현재 · 인증 연동</text>
+  <rect x="285" y="226" width="170" height="100" rx="12" fill="#fff" stroke="#b8c7d7"/>
+  <text x="316" y="266" class="label">Google</text><text x="307" y="300" class="small">회사 계정</text>
+  <path d="M466 276 H507" class="line"/>
+  <rect x="520" y="226" width="187" height="100" rx="12" fill="#d9f1eb" stroke="#8fc5b9"/>
+  <text x="550" y="266" class="label">Authentik</text><text x="547" y="300" class="small">IdP · 접근 정책</text>
+  <path d="M719 276 H754 V190 H787" class="line"/>
+  <path d="M719 276 H787" class="line"/>
+  <path d="M754 276 V370 H787" class="line"/>
+  <rect x="800" y="142" width="374" height="88" rx="12" fill="#f0f9f8" stroke="#b8dcd7"/>
+  <text x="819" y="176" class="label">운영 도구</text><text x="819" y="210" class="small">OIDC / OAuth 연동</text>
+  <rect x="800" y="251" width="374" height="65" rx="12" fill="#f0f9f8" stroke="#b8dcd7"/>
+  <text x="819" y="291" class="body">oauth2-proxy → 인증 없는 도구</text>
+  <rect x="800" y="338" width="374" height="100" rx="12" fill="#f0f6fd" stroke="#bfd3e9"/>
+  <text x="819" y="371" class="label">AWS · 임시 권한</text>
+  <text x="819" y="407" class="small">콘솔 SAML / CLI OIDC</text>
+  <rect x="285" y="462" width="185" height="62" rx="12" fill="#f2f5fb" stroke="#bcc8dc"/>
+  <text x="303" y="500" class="body">Git · Blueprint</text>
+  <path d="M482 493 H514" class="config"/>
+  <rect x="529" y="462" width="168" height="62" rx="12" fill="#f2f5fb" stroke="#bcc8dc"/>
+  <text x="566" y="500" class="body">Argo CD</text>
+  <path d="M613 450 V338" class="config"/>
+  <text x="630" y="391" class="small">설정</text>
+  <text x="727" y="500" class="small">점선: 설정 동기화 · 실선: 인증 연동</text>
+</svg>

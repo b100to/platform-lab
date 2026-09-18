@@ -1,0 +1,2 @@
+# Preserve generated PDF bytes and treat them as binary in diffs and merges.
+*.pdf binary
