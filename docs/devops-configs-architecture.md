@@ -57,13 +57,13 @@ remote_env = { dev = "dev", stage = "prod", prod = "prod" } # stage 전용 netwo
 | 워크로드 런타임 | ECS Fargate. task definition과 컨테이너 command까지 Terraform이 소유 ([`backend.tf`](https://github.com/b100to/infra-config-portfolio/blob/83a3c408fb7be3917c0f2efba3d137f54c0fa205/terraform/dev/common/ecs/backend.tf)) | EKS. Terraform은 플랫폼까지, workload는 Helm values와 Argo CD |
 | 실행과 state | Terraform Cloud VCS-driven, workspace별 state | GitHub Actions + S3 backend, `--changed`로 대상 stack 선택 |
 | 브랜치 모델 | `dev`·`stage`·`prod` 환경 브랜치, push마다 Terraform Cloud 트리거 | `main` + feature 브랜치, 환경은 stack tag로 선택 |
-| backend 선언 | 디렉터리마다 직접 쓴 `backend "remote"` 44개 | [`imports/backend.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/imports/backend.tm.hcl) 생성 규칙 1개가 stack 75개에 생성 |
+| backend 선언 | 디렉터리마다 직접 쓴 `backend "remote"` 39개 | [`imports/backend.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/imports/backend.tm.hcl) 생성 규칙 1개로 69개 stack의 S3 backend 관리 |
 | 버전 고정 | 디렉터리별 선언. Terraform 제약 5종, AWS provider 제약 7종(major 3·4 공존) | 루트 [`config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/config.tm.hcl)의 globals 한 곳 |
 | 환경 차이 표현 | 디렉터리 복제 또는 `locals`의 환경 키 map. `network/dev/main.tf`와 `network/prod/main.tf`는 158줄 중 `Environment` 태그 1줄만 다름 | leaf에는 `stack.tm.hcl`·`tfvars.tm.hcl` 등 차이만 두고 나머지는 생성 |
 | stack 간 값 전달 | `terraform_remote_state` 59곳이 workspace 이름 문자열을 참조 | `input` 블록 86개가 stack ID를 참조. `terraform_remote_state`는 0 |
 | CI 자격 증명 | workspace 환경 변수에 IAM user access key ([`terraform.md`](https://github.com/b100to/infra-config-portfolio/blob/83a3c408fb7be3917c0f2efba3d137f54c0fa205/terraform/terraform.md)) | GitHub OIDC로 role assume ([`_bootstrap/oidc_aws_github`](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec/_bootstrap/oidc_aws_github)) |
 
-수치는 두 스냅샷에서 `grep`으로 센 값이며, 입사 시점 쪽은 실험용 `terraform/test/`를 제외했다. 3절의 경로 축, 4절의 생성 규칙과 값 공유는 각각 이 표의 행 하나에 대한 현재의 답이다.
+수치는 두 스냅샷의 선언을 집계한 값이다. 입사 시점의 remote backend는 실험용 `terraform/test/`를 제외하면 39개, 포함하면 44개다. 현재 전체 75개 stack 중 69개에는 S3 backend, `_bootstrap` 4개에는 local backend가 있고, pod-identity-agent/kubecost의 dev·prd 2개에는 backend 파일이 없다. 3절의 경로 축, 4절의 생성 규칙과 값 공유는 각각 이 표의 행 하나에 대한 현재의 답이다.
 
 ### 1-2. 배포 쪽: Kubernetes manifest 분리 저장소
 
@@ -108,7 +108,7 @@ acmemall-backend-v4/
 | 이유 | 설명 |
 |---|---|
 | 하나의 개념이 두 저장소에 걸친다 | 인프라와 배포는 이름으로 이어져 있다. 저장소가 나뉘면 그 연결이 PR 두 개와 맞춰야 할 순서로 바뀐다 |
-| LLM 보조 작업 | 에이전트는 열려 있는 저장소만 읽는다. 연결의 절반이 다른 저장소에 있으면 한 세션에서 추적하지도, 한 PR로 고치지도 못한다 |
+| LLM 보조 작업 | 저장소별로 나뉜 작업 맥락에서 연결을 추적하려면 다른 저장소를 추가로 탐색해야 했다. 통합해 탐색과 변경 검토를 한 작업 맥락·PR에 모았다 |
 | 코드 규모 | 저장소 분리의 이점(독립 권한, 독립 릴리스 주기)은 규모가 클 때 나온다. 한 팀이 관리하는 규모에서는 오가는 비용만 남는다 |
 
 첫 번째 이유의 예가 컨테이너 이미지 저장소 이름이다. 현재 저장소에서는 같은 문자열이 두 계층에 나란히 있다.
@@ -120,7 +120,7 @@ values/apps/mall/v4/api/dev.yaml        repository: acmemall-backend-v4/dev/api 
 
 [`ECR stack`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/ecr/mall/dev/main.tf)과 [`앱 values`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/values/apps/mall/v4/api/dev.yaml)가 한 저장소에 있으므로 한 번의 검색으로 양쪽이 나오고, 이름을 바꾸는 변경이 한 PR에 담긴다.
 
-두 번째 이유는 저장소에 흔적이 남아 있다. 루트의 [`AGENTS.md`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/AGENTS.md)는 “Terraform 적용 규칙”과 “ArgoCD/Helm 작업 규칙”을 한 파일에 담는다. 에이전트용 규칙이 인프라와 배포를 함께 다룰 수 있는 것은 경계가 하나이기 때문이다.
+두 번째 이유는 저장소에 흔적이 남아 있다. 루트의 [`AGENTS.md`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/AGENTS.md)는 “Terraform 적용 규칙”과 “ArgoCD/Helm 작업 규칙”을 한 파일에 담아, 인프라와 배포의 작업 규칙을 한곳에서 찾도록 한다.
 
 반대급부는 권한과 변경 반경이 한 저장소로 모인다는 점이다. 실행 범위는 `--changed`와 환경 tag가 stack 단위로 좁힌다. 권한은 아직 좁히지 않았다. 이 스냅샷의 [`CODEOWNERS`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/.github/CODEOWNERS)는 단일 소유자 규칙 하나이고, 팀이 커지면 경로별 소유자로 나누는 것이 저장소를 다시 쪼개는 것보다 먼저 쓸 수단이다.
 

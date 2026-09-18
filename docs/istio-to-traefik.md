@@ -34,7 +34,7 @@ Envoy 수준까지 익히는 일은 우선순위가 될 수 없었다. 플랫폼
 | `VirtualService` | 4 | 경로 매칭, rewrite, 목적지 지정 |
 | `DestinationRule`, `PeerAuthentication`, `AuthorizationPolicy`, `EnvoyFilter` 등 | 0 | 트래픽 정책, mTLS, 서비스 간 인가 |
 
-쓰고 있던 것은 L7 인그레스 라우팅이 전부였다. [`VirtualService template`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/api-admin/helm/templates/virtualservice.yaml)은 prefix를 매칭해 `/`로 rewrite하고 서비스로 보내는 것이 전부다. 메시를 메시답게 만드는 기능은 선언된 적이 없었다.
+공개 스냅샷에서 확인되는 명시적 설정은 L7 인그레스 라우팅 중심이었다. [`VirtualService template`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/api-admin/helm/templates/virtualservice.yaml)은 prefix를 매칭해 `/`로 rewrite하고 서비스로 보낸다. 다만 정책이 없어도 sidecar 간 [auto mTLS](https://istio.io/latest/docs/tasks/security/authentication/authn-policy/)는 동작할 수 있으므로, 일부 스냅샷의 리소스 수만으로 전체 메시 기능의 미사용을 단정할 수는 없다.
 
 반대로 비용은 전부 내고 있었다.
 
@@ -50,11 +50,11 @@ Envoy 수준까지 익히는 일은 우선순위가 될 수 없었다. 플랫폼
 | 메시가 값을 하는 조건 | 이 환경 |
 |---|---|
 | 서비스 간 호출이 많고 그 그래프가 복잡함 | 서비스 20여 개. MSA 경계가 뚜렷하지 않고 대부분의 트래픽이 외부 → 서비스 방향 |
-| 서비스 간 mTLS와 인가를 정책으로 강제해야 함 | 선언된 정책 0 |
+| 서비스 간 mTLS와 인가를 정책으로 강제해야 함 | 공개 스냅샷에서 명시적 강제 정책은 확인되지 않음 |
 | 카나리·미러링 같은 세밀한 트래픽 제어를 일상적으로 씀 | 사용하지 않음 |
 | 메시를 전담할 사람이 있음 | 없음 |
 
-어느 행에도 해당하지 않았다. 남은 질문은 "메시 없이 지금 쓰는 기능을 그대로 할 수 있는가"였고, 필요한 기능 목록은 짧았다.
+팀이 전환 당시 운영 요구로 정리한 것은 인그레스 기능이었다. 남은 질문은 "메시 없이 필요한 기능을 제공할 수 있는가"였고, 목록은 짧았다.
 
 | 실제로 필요한 것 | 근거 |
 |---|---|
@@ -71,13 +71,13 @@ Envoy 수준까지 익히는 일은 우선순위가 될 수 없었다. 플랫폼
 | 선택지 | 판단 |
 |---|---|
 | Istio 유지 | 1~2절의 문제가 그대로 남음 |
-| ALB 단독 (AWS Load Balancer Controller의 Ingress만 사용) | host·path 라우팅은 되지만 prefix 제거, CORS 헤더 조작, rate limit 같은 L7 가공을 할 수 없음. 서비스마다 ALB 규칙이 늘어 AWS 쪽 변경이 잦아짐 |
+| ALB 단독 (AWS Load Balancer Controller의 Ingress만 사용) | URL rewrite·CORS 응답 헤더도 지원. 이 환경에서는 서비스 라우팅과 공통 middleware를 Kubernetes CRD로 관리하고 AWS 리소스 변경과 분리하는 방식을 선호 |
 | ingress-nginx | 사실상의 표준이지만 **retirement가 발표됨.** 2026년 3월까지 best-effort 유지보수, 그 뒤로는 릴리스와 보안 패치가 없음 ([Kubernetes 공지](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)) |
 | Traefik | 필요한 기능을 `IngressRoute`와 `Middleware` 두 CRD로 선언. 유지보수가 활발함 |
 
 가장 익숙한 선택지는 ingress-nginx였다. 하지만 복잡도를 줄이려고 옮기는 마당에, 옮기자마자 다시 옮겨야 할 도구를 고를 수는 없었다. 이 전환의 시점(2025년 12월)이 공지 직후였다는 점이 결정을 단순하게 만들었다. 도구를 고를 때 기능표만큼 **그 도구가 3년 뒤에도 패치되는가**를 본다.
 
-Traefik을 고른 두 번째 이유는 설정의 모양이다. 라우팅 규칙이 annotation 문자열이 아니라 CRD 필드라서 Git diff로 읽히고, 재사용할 가공 단계는 `Middleware`로 떼어 여러 라우트가 참조한다.
+Traefik을 고른 두 번째 이유는 설정의 모양이다. 라우팅 규칙이 annotation 문자열이 아니라 CRD 필드라서 Git diff로 읽히고, 재사용할 가공 단계는 `Middleware`로 떼어 여러 라우트가 참조한다. ALB의 [URL rewrite](https://aws.amazon.com/about-aws/whats-new/2025/10/application-load-balancer-url-header-rewrite/)와 [CORS 응답 헤더 삽입](https://aws.amazon.com/about-aws/whats-new/2024/11/aws-application-load-balancer-header-modification-enhanced-traffic-control-security/)도 전환 시점에 제공되던 기능이므로, 차이는 기능의 유무보다 관리 방식과 책임 분리에 있다.
 
 ## 4. 설계: AWS 리소스와 애플리케이션 라우팅을 분리
 
@@ -213,9 +213,9 @@ replica 3 이상에서 `Honor`가 빠지면 세 번째 pod이 Pending에 걸린�
 
 | 항목 | 상태 |
 |---|---|
-| 서비스 간 mTLS | 없음. 쓰던 기능이 아니라 잃은 것은 없지만, 요구가 생기면 메시 없이 풀 방법을 다시 찾아야 함 |
+| 서비스 간 mTLS | Traefik이 대체하지 않음. 이전 auto mTLS 사용 여부는 스냅샷으로 확인되지 않으며, 강제 요구가 생기면 별도 설계 필요 |
 | 서비스 간 호출 관측 | 메시 텔레메트리 없음. 서비스 간 추적은 APM에 의존 |
-| 조용히 무시되는 설정 | Traefik은 잘못된 matcher 이름(`HeadersRegexp`)이나 namespace를 빠뜨린 `Middleware` 참조를 에러 없이 무시함. 라우트가 "없는" 증상으로만 나타남 ([SSO 문서](sso-authentik.md) 5-3절) |
+| 라우트 설정 오류 진단 | matcher 이름·`Middleware` 참조 오류를 당시 로그에서 바로 찾지 못해 라우트 문법과 참조 대상을 직접 확인 ([SSO 문서](sso-authentik.md) 5-3절) |
 | 도메인 목록이 한 곳에 | 모든 호스트가 Ingress 하나의 annotation에 있어 변경이 한 파일에 몰림. 역할 분리의 대가 |
 | Istio 흔적 | 배치 chart에 `disableIstio` 옵션 등 쓰이지 않는 설정이 남아 있음 |
 | Ingress API의 다음 | upstream은 Gateway API를 권장. Traefik도 구현하고 있어 경로는 열려 있으나 아직 옮기지 않음 |

@@ -20,13 +20,13 @@ Kubernetes 위의 운영 도구와 AWS 접근을 하나의 IdP로 묶고, 그 Id
 
 ## 2. IdP 선택: 설정을 Git에 둘 수 있는가
 
-| 관점 | SaaS IdP | Keycloak | Authentik |
+| 관점 | 검토한 사용자당 과금 SaaS IdP | Keycloak | Authentik |
 |---|---|---|---|
 | 형태 | SaaS | self-hosted | self-hosted |
-| 과금 | 사용자당 | 없음 | 없음 |
-| 설정 방식 | UI 중심 | UI와 export 파일 | **Blueprint (YAML)** |
+| 과금 | 사용자당 | 오픈소스 자체 운영 | 오픈소스 자체 운영 |
+| 설정 방식 | 제품별 API·자동화 지원 확인 필요 | JSON import/export·Admin API | **Blueprint (YAML)** |
 
-결정적인 기준은 마지막 행이다. 이 저장소는 인프라와 배포를 전부 Git에서 선언한다. IdP만 UI에서 클릭으로 관리하면, 가장 민감한 설정이 유일하게 리뷰도 이력도 없는 영역이 된다. Authentik의 Blueprint는 애플리케이션, provider, 정책, 그룹을 YAML로 선언하고 서버가 그것을 읽어 적용한다.
+결정적인 기준은 팀이 이해하기 쉬운 선언 방식이었다. [Keycloak도 설정 자동화가 가능](https://www.keycloak.org/server/importExport)하지만, 애플리케이션·provider·정책·그룹을 YAML로 선언하는 Authentik Blueprint가 이 저장소의 GitOps 운영 방식에 가장 직접적으로 맞았다. 인증 설정도 코드 리뷰와 변경 이력에 포함할 수 있었다.
 
 사용자당 과금은 팀이 커질수록 비용이 따라 커지는 구조라 먼저 제외했다.
 
@@ -87,7 +87,7 @@ Blueprint에는 client secret 자리에 환경 변수 참조만 적는다.
   remoteRef: { key: <cluster-secret>, property: <property> }
 ```
 
-ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, Blueprint의 `!Env`가 그 값을 읽는다. 앱 쪽 [`ExternalSecret`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/manifests/external-secrets/prd/es-kubecost-oauth2.yaml)도 Secrets Manager의 **같은 property**를 읽으므로, IdP가 아는 secret과 앱이 보내는 secret이 어긋날 수 없다. 스냅샷에서 Blueprint의 `!Env` 변수 7개가 전부 ExternalSecret 키에 대응하는 것을 확인했다.
+ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, Blueprint의 `!Env`가 그 값을 읽는다. 앱 쪽 [`ExternalSecret`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/manifests/external-secrets/prd/es-kubecost-oauth2.yaml)도 Secrets Manager의 **같은 property**를 읽어 수동 복사에 따른 불일치를 줄였다. 갱신·pod 재시작 시점이 다르면 일시적으로 값이 다를 수 있다. 스냅샷에서 Blueprint의 `!Env` 변수 7개가 전부 ExternalSecret 키에 대응하는 것을 확인했다.
 
 ### 접근 모델도 선언이다
 
@@ -96,9 +96,9 @@ ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, 
 | Google 계정으로 최초 로그인 | 제한 그룹에 자동 배정. 사내 위키만 보임 |
 | 개발자로 승격 | 관리자가 개발 그룹에 추가 (수동, 한 번) |
 | 개발 도구 접근 | 앱마다 "개발 그룹만 허용" expression policy를 바인딩 |
-| 퇴사 | Authentik 계정 하나를 비활성화 |
+| 퇴사 | Authentik 계정 비활성화로 신규 인증 차단을 중앙화 |
 
-"처음 들어온 사람은 아무것도 못 본다"가 기본값이라는 점이 중요하다. 권한은 기본으로 열려 있다가 닫는 것이 아니라 닫혀 있다가 여는 것이다.
+신규 사용자의 기본 권한은 위키로 제한하고, 개발 도구 권한은 별도로 부여한다. 기존 앱 세션의 종료는 앱의 [Single Logout 지원·설정](https://docs.goauthentik.io/add-secure-apps/providers/single-logout/)에 의존하며, 이미 발급한 AWS 임시 자격 증명은 [만료·회수 정책](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html)을 함께 확인해야 한다.
 
 ## 5. 앱 연동: 앱이 지원하는 만큼만
 
@@ -115,14 +115,14 @@ ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, 
 
 ### 5-1. Argo CD: public client 하나로 웹과 CLI를 통합
 
-Authentik은 **application마다 issuer가 다르다.** CLI용 provider를 따로 만들면 issuer가 `/application/o/argocd-cli/`가 되어, 서버가 기대하는 `/application/o/argocd/`와 어긋나 토큰 검증이 실패한다.
+이 구성에서는 **application마다 issuer가 다르다.** CLI용 provider를 따로 만들면 issuer가 `/application/o/argocd-cli/`가 되어, 서버가 기대하는 `/application/o/argocd/`와 어긋나 토큰 검증이 실패한다.
 
 | 시도 | 결과 |
 |---|---|
 | 웹은 confidential, CLI는 별도 public provider | issuer 불일치로 CLI 로그인 실패 |
 | provider 하나를 public으로 두고 웹과 CLI가 공유 | 동작. CLI용 `http://localhost:.*/auth/callback` redirect URI만 추가 |
 
-public client는 secret이 없지만 PKCE가 그 자리를 채운다. 로그인 시작 시 만든 일회성 값이 없으면 authorization code를 가로채도 토큰으로 바꿀 수 없다. CLI는 어차피 secret을 안전하게 보관할 수 없으므로, secret이 있는 척하는 것보다 정확한 모델이다.
+CLI는 secret을 안전하게 보관하기 어려워 public client로 구성하고, authorization code 탈취를 완화하기 위해 [PKCE](https://www.rfc-editor.org/info/rfc7636/)를 사용했다. 로그인 시작 시 만든 일회성 값으로 코드 교환을 보호하는 방식이며, client secret을 통한 클라이언트 인증과는 역할이 다르다.
 
 ### 5-2. 인증이 없는 도구: oauth2-proxy
 
@@ -135,7 +135,7 @@ public client는 secret이 없지만 PKCE가 그 자리를 채운다. 로그인 
 
 [`IngressRoute`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/manifests/traefik/prd/infra.yaml)는 해당 호스트의 모든 트래픽을 proxy로 보낸다. 도구 자체에는 인증 설정이 없다.
 
-여기서 밟은 함정: cookie secret을 컨테이너 `args`의 `$(VAR)` 치환으로 넘기면 재배포 때 cookie signature가 맞지 않았다. 치환 동작이 런타임에 따라 달랐기 때문이다. `OAUTH2_PROXY_COOKIE_SECRET` 같은 네이티브 환경 변수로 넘기는 것으로 통일했다.
+이 구성에서는 cookie secret을 `args`로 전달하던 중 재배포 뒤 로그인 루프를 겪었다. `OAUTH2_PROXY_COOKIE_SECRET` 같은 네이티브 환경 변수로 전달 방식을 통일해 해결했다. 이 관찰만으로 Kubernetes의 `$(VAR)` 치환 기능 자체가 불안정하다고 일반화하지는 않는다.
 
 ### 5-3. Argo Workflows: 무한 리다이렉트
 
@@ -149,7 +149,7 @@ Traefik은 로그인이 끝났는지 알 방법이 없다. 하지만 로그인 �
 
 ```yaml
 routes:
-  - match: Host(`...`) && HeaderRegexp(`Cookie`, `authorization=`)   # 인증됨 → 그대로 전달
+  - match: Host(`...`) && HeaderRegexp(`Cookie`, `authorization=`)   # 쿠키 있음 → 앱에서 검증
     priority: 20
   - match: Host(`...`) && Path(`/`)                                  # 미인증의 첫 진입 → SSO
     priority: 15
@@ -158,9 +158,9 @@ routes:
     priority: 10
 ```
 
-쿠키는 HttpOnly라 스크립트로 위조해 우회할 수 없고, 쿠키가 있어도 실제 권한 검증은 Argo Workflows가 한다. Traefik 라우트는 "어디로 보낼까"만 정한다.
+쿠키 유무는 리다이렉트 경로를 고르는 힌트이며 인증 판정이 아니다. [HttpOnly](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie)는 브라우저 JavaScript의 쿠키 접근을 제한할 뿐 요청의 진위를 보장하지 않는다. 실제 세션·권한 검증은 Argo Workflows가 담당한다.
 
-이 문제를 오래 끈 원인은 따로 있었다. Traefik v3에서 matcher 이름이 `HeadersRegexp`에서 `HeaderRegexp`로 바뀌었는데, v2 이름을 쓰면 **에러 없이 규칙이 무시된다.** 로그에 아무것도 남지 않아 설계가 틀렸다고 오해한 채 시간을 썼다.
+이 문제를 오래 끈 원인은 따로 있었다. Traefik v3에서 matcher 이름이 [`HeadersRegexp`에서 `HeaderRegexp`로 바뀌었다](https://doc.traefik.io/traefik/migrate/v2-to-v3-details/). 당시 확인한 로그에서는 원인을 바로 찾지 못해 설계를 의심했지만, v3 문법으로 수정해 해결했다.
 
 ### 5-4. IdP 자체의 라우팅: 호출자가 누구인가
 
@@ -195,7 +195,7 @@ aws CLI ──credential_process──▶ aws-oidc.sh
 
 [`aws-oidc.sh`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/scripts/aws-oidc.sh)는 AWS CLI가 자격 증명이 필요할 때 호출하는 프로그램이다. 사용자는 하루에 한 번 브라우저 로그인을 하고, 그 뒤 12시간은 refresh token이 조용히 갱신한다. `aws`를 호출하는 다른 도구와 에이전트도 같은 프로필을 그대로 쓴다.
 
-콘솔용 SAML과 CLI용 OIDC를 나눈 이유는 갱신 방식이다. SAML은 매번 브라우저를 거쳐야 하지만 OIDC는 refresh token이 있다. 하루에 수백 번 호출되는 CLI에는 후자가 맞다.
+콘솔용 SAML과 CLI용 OIDC를 나눈 이유는 이 구현에서의 갱신 방식이다. CLI는 refresh token으로 OIDC 토큰을 갱신하고 STS 자격 증명을 재발급하도록 설계해, 반복 호출 시 브라우저 재인증 빈도를 줄였다.
 
 ### IAM 쪽 신뢰 조건
 
@@ -219,13 +219,13 @@ Condition = {
 |---|---|---|
 | Argo CD CLI 로그인 시 토큰 검증 실패 | application별 issuer. CLI용 별도 provider는 issuer가 다름 | provider 하나를 public + PKCE로 공유 (5-1) |
 | Argo Workflows 무한 리다이렉트 | Traefik이 로그인 완료를 알 수 없음 | 쿠키 유무로 라우트 분기 (5-3) |
-| 위 분기가 작동하지 않음, 로그 없음 | Traefik v3의 `HeaderRegexp`. v2 이름은 조용히 무시됨 | matcher 이름 수정 |
+| 위 분기가 작동하지 않고 당시 확인한 로그로 원인 파악이 어려웠음 | Traefik v3에 v2 matcher 이름 사용 | `HeaderRegexp`로 수정 |
 | Argo Workflows `code:7 "not allowed"` | Kubernetes 1.24부터 ServiceAccount token Secret이 자동 생성되지 않음 | `kubernetes.io/service-account-token` Secret을 직접 선언 |
-| oauth2-proxy 재배포 뒤 로그인 루프 | `args`의 `$(VAR)` 치환 차이로 cookie signature 불일치 | 네이티브 환경 변수로 전달 (5-2) |
+| oauth2-proxy 재배포 뒤 로그인 루프 | 당시 `args`로 전달하던 cookie secret 구성을 점검 | 네이티브 환경 변수 전달로 통일해 해결 (5-2) |
 | oauth2-proxy `--cookie-refresh` 사용 시 루프 | `offline_access` scope가 없어 refresh token 미발급 | scope 추가 |
-| IdP가 산발적으로 503 | server CPU limit이 낮아 throttle → readiness 실패 → 재시작 반복 | CPU limit 상향, replica 2 + 노드 분산 ([분산 설계](eks-workload-availability.md)) |
+| IdP가 산발적으로 503 | server CPU limit이 낮아 throttle → readiness 실패 → 서비스 대상에서 제외 | CPU limit 상향, replica 2 + 노드 분산 ([분산 설계](eks-workload-availability.md)) |
 
-마지막 행은 SSO의 성격을 보여준다. 모든 도구의 로그인이 IdP 하나에 걸리므로, IdP의 가용성이 곧 전체 도구의 가용성이다.
+마지막 행은 신규 로그인 경로가 IdP에 의존함을 보여준다. 기존 앱 세션은 별도로 유지될 수 있다. [readiness 실패](https://kubernetes.io/docs/concepts/workloads/pods/probes/) 자체는 컨테이너를 재시작하지 않으므로, 재시작 현상은 liveness·프로세스 종료 등 별도 원인과 구분한다.
 
 ## 8. 한계: Synced가 "적용됨"은 아니다
 
@@ -244,17 +244,17 @@ Blueprint 방식의 가장 큰 함정은 운영 중에 발견했다.
 | 성질 | 결과 |
 |---|---|
 | 파일 단위 원자성 | 항목 하나의 검증 실패가 파일 전체를 막음 |
-| 내용 해시가 바뀔 때만 재적용 | **주석 한 줄**을 고쳐도 재적용되고, 그동안 쌓인 불일치가 그때 터짐 |
-| 파일명 알파벳순 실행 | 다른 Blueprint의 객체를 참조하면 순서에 따라 실패. 같은 파일 안에서 만들고 참조하는 쪽이 안전 |
+| 정기 적용과 파일 변경 감시 | 운영 당시 주석 변경을 계기로 재적용 오류가 드러남. 세부 재적용 동작은 사용 버전과 상태를 확인 |
+| 기본 실행 순서는 보장되지 않음 | 객체 의존성은 같은 파일에 두거나 `metaapplyblueprint`로 명시 |
 | 선언에서 지운 객체는 DB에 남음 | 삭제는 `state: absent`로 명시해야 함 |
 
-GitOps의 "선언 = 현실"은 **선언을 읽는 쪽이 성공을 보고할 때만** 성립한다. Argo CD는 Kubernetes 리소스까지만 보고, 그 리소스를 읽는 애플리케이션 내부는 보지 못한다. 그래서 Blueprint 상태를 직접 조회하는 점검을 검증 절차에 넣었다. 자동 감시는 아직 과제다.
+이 적용 방식과 원자성·순서 제약은 [공식 Blueprint 문서](https://docs.goauthentik.io/customize/blueprints)를 기준으로 구분했다. Argo CD의 기본 상태 확인만으로는 애플리케이션 내부 적용 성공을 알 수 없어, Blueprint 상태를 직접 조회하는 점검을 검증 절차에 넣었다. 자동 감시는 아직 과제다.
 
 그 밖에 코드로 옮기지 못한 것:
 
 | 항목 | 이유 |
 |---|---|
-| 로그인 화면에 Google source 연결 | Blueprint의 `!Find`를 list 안에서 쓸 수 없음 |
+| 로그인 화면에 Google source 연결 | 당시 구성에서 list 내부 `!Find` 참조를 해결하지 못해 수동 연결 유지 |
 | 사용자의 그룹 배정 | 사람에 대한 판단이라 의도적으로 수동 |
 
 ## 9. 결과
@@ -262,7 +262,7 @@ GitOps의 "선언 = 현실"은 **선언을 읽는 쪽이 성공을 보고할 때
 | 항목 | 이전 | 현재 |
 |---|---|---|
 | 입사자 온보딩 | 도구마다 계정 생성 | Google 계정 로그인 + 그룹 추가 한 번 |
-| 퇴사자 처리 | 도구마다 계정 삭제 | IdP 계정 비활성화 한 번 |
+| 퇴사자 처리 | 도구마다 계정 삭제 | 신규 인증 차단은 IdP로 중앙화. 기존 세션·임시 자격 증명은 별도 만료·회수 확인 |
 | 인증 없는 도구 | IP 제한만 | proxy 뒤에서 SSO |
 | AWS 콘솔 | IAM User (장기) | SAML (임시) |
 | AWS CLI | access key (장기) | OIDC + `credential_process` (임시, 자동 갱신) |
