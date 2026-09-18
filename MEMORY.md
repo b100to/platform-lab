@@ -5,3 +5,4 @@
 - [EKS workload availability design](memory/eks-workload-availability.md)
 - [Authentik SSO design](memory/sso-authentik.md)
 - [Istio to Traefik migration](memory/istio-to-traefik.md)
+- [Hiring portfolio (md + diagrams)](memory/portfolio.md)

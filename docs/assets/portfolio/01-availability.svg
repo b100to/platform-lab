@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="246" viewBox="0 0 920 246" role="img" aria-label="장애 시나리오 다섯 단계: 평시 1대1, 노드 A 이탈, 대체 pod 기동, 복귀 뒤 0대2, 재분산 1대1">
+<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M1.5 1.2 L6.8 4 L1.5 6.8" fill="none" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="920" height="246" fill="#FFFFFF"/>
+<text x="24" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#6B7280" text-anchor="start">1</text>
+<text x="40" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">평시 1 : 1</text>
+<text x="24" y="60" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">TSC hostname 강제</text>
+<rect x="24" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="60" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 A</text>
+<rect x="49.0" y="102" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<rect x="112" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="148" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 B</text>
+<rect x="137.0" y="102" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<line x1="187" y1="118" x2="199" y2="118" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="202" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#6B7280" text-anchor="start">2</text>
+<text x="218" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">노드 A 이탈</text>
+<text x="202" y="60" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">B가 계속 서빙</text>
+<rect x="202" y="76" width="72" height="84" rx="3" fill="#F3F4F6" stroke="#6B7280" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="238" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 A</text>
+<text x="238" y="130" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">NotReady</text>
+<rect x="290" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="326" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 B</text>
+<rect x="315.0" y="102" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<line x1="365" y1="118" x2="377" y2="118" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="380" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#6B7280" text-anchor="start">3</text>
+<text x="396" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">대체 pod 기동</text>
+<text x="380" y="60" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">Honor · 죽은 노드 제외</text>
+<rect x="380" y="76" width="72" height="84" rx="3" fill="#F3F4F6" stroke="#6B7280" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="416" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 A</text>
+<text x="416" y="130" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="12.5" font-weight="400" fill="#6B7280" text-anchor="middle">NotReady</text>
+<rect x="468" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="504" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 B</text>
+<rect x="493.0" y="102" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<rect x="493.0" y="130" width="22" height="22" rx="2" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.5"/>
+<line x1="543" y1="118" x2="555" y2="118" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="558" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#6B7280" text-anchor="start">4</text>
+<text x="574" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">A 복귀 0 : 2</text>
+<text x="558" y="60" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">아무도 옮기지 않음</text>
+<rect x="558" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="594" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 A</text>
+<rect x="646" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="682" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 B</text>
+<rect x="671.0" y="102" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<rect x="671.0" y="130" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<line x1="721" y1="118" x2="733" y2="118" stroke="#6B7280" stroke-width="1.2" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="736" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#6B7280" text-anchor="start">5</text>
+<text x="752" y="40" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="16" font-weight="600" fill="#111827" text-anchor="start">재분산 1 : 1</text>
+<text x="736" y="60" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">Descheduler + PDB</text>
+<rect x="736" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="772" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 A</text>
+<rect x="761.0" y="102" width="22" height="22" rx="2" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.5"/>
+<rect x="824" y="76" width="72" height="84" rx="3" fill="#FFFFFF" stroke="#111827" stroke-width="1"/>
+<text x="860" y="95" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="middle">노드 B</text>
+<rect x="849.0" y="102" width="22" height="22" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<line x1="24" y1="182" x2="896" y2="182" stroke="#D1D5DB" stroke-width="1" stroke-linecap="round"/>
+<rect x="28.0" y="197" width="14" height="14" rx="2" fill="#1F3A5F" stroke="#1F3A5F" stroke-width="1.5"/>
+<text x="50" y="209" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">pod</text>
+<rect x="88.0" y="197" width="14" height="14" rx="2" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.5"/>
+<text x="110" y="209" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">새로 뜬 pod</text>
+<text x="230" y="209" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="600" fill="#111827" text-anchor="start">노드 공급 · Karpenter</text>
+<text x="372" y="209" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#374151" text-anchor="start">AZ별 NodePool, pool당 통상 1대, 최초 만료 시점 분산, pool별 중단 예산 1대</text>
+<text x="24" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">복귀만으로는 분포가 돌아오지 않는다. 배치(TSC)와 재배치(Descheduler)가 따로 필요한 이유.</text>
+</svg>
