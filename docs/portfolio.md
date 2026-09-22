@@ -1,6 +1,6 @@
 # 플랫폼 엔지니어링 포트폴리오
 
-`[이름]` · DevOps Engineer · `[이메일]` · `[GitHub]`
+백종화 · DevOps Engineer · [b100hhss@gmail.com](mailto:b100hhss@gmail.com) · [github.com/b100to](https://github.com/b100to)
 
 운영 중인 EKS 플랫폼에서 복잡도를 덜어내고, 설정을 코드로 선언하고, 장애에 버티게 만든 네 가지 작업이다.
 
@@ -9,9 +9,11 @@
 | 1 | 워크로드 분산 | 2026.05 – 07 | 노드 한 대가 빠져도 서비스가 남도록 네 층으로 설계 | 강제 분산이 장애 중 복구를 막는 경우를 재현으로 확인 |
 | 2 | Istio → Traefik | 2025.12 – 2026.01 | 서비스 메시를 걷어내고 20여 개 서비스를 무중단 전환 | 명시적 Istio 선언은 `Gateway` 4 · `VirtualService` 4뿐 |
 | 3 | Authentik SSO | 2026 | 계정 하나로 운영 도구와 AWS까지. IdP 설정도 Git으로 | 앱 20 · provider 10 · 정책 15를 YAML로 선언 |
-| 4 | GitOps 재설계 | `[기간]` | 저장소 둘과 Terraform Cloud를 모노레포 하나로 | backend 선언 39 → 생성 규칙 1 |
+| 4 | GitOps 재설계 | 2024.03 – 2026.03 | 저장소 둘과 Terraform Cloud를 모노레포 하나로 | backend 선언 39 → 생성 규칙 1 |
 
 수치는 고정 commit의 코드 스냅샷에서 직접 세었거나 로컬 클러스터에서 재현한 값이다. 증명하지 못하는 부분은 각 절의 "한계"에 적었다.
+
+**현재 구현 코드:** [devops-configs-portfolio](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec) - Terraform·Terramate·Helm·Argo CD 설정을 담은 GitOps 모노레포.
 
 ---
 
@@ -32,8 +34,8 @@
 | kind 재현 (Kubernetes v1.35) | `Ignore` 기본값 | `Honor` |
 |---|---|---|
 | replica 3, 앱 노드 2대 + taint 노드 | 1개 Pending | 2 : 1 배치 |
-| 노드가 빠진 동안 | 대체 pod Pending | 생존 노드에 Running |
-| 노드 복귀 뒤 | 1 : 1 | 2 : 0 그대로 |
+| 노드가 빠진 동안 (replica 2) | 대체 pod Pending | 생존 노드에 Running |
+| 노드 복귀 뒤 (replica 2) | 1 : 1 | 2 : 0 그대로 |
 
 - **한계** — Descheduler의 evict 동작은 로컬에서 재현하지 않았다. `Honor`는 장애 중 pod을 생존 노드에 모으므로 그 노드의 requests 여유가 전제다.
 
@@ -58,7 +60,7 @@
 | ingress-nginx | 사실상의 표준이지만 [retirement 공지](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/) 직후. 2026년 3월 이후 보안 패치 없음 |
 | **Traefik** | 필요한 기능을 CRD 두 종류로 선언. 유지보수 활발 |
 
-- **설계** — ALB·인증서·DNS는 Load Balancer Controller가, host·path 라우팅은 Traefik이 소유한다. 연결점은 catch-all Ingress 하나라서 서비스가 늘어도 ALB 규칙은 하나다.
+- **설계** — ALB·인증서 연결은 Load Balancer Controller가, DNS는 ExternalDNS가, host·path 라우팅은 Traefik이 소유한다. 연결점은 catch-all Ingress 하나라서 서비스가 늘어도 ALB 규칙은 하나다.
 - **전환** — 새 ALB를 옛 ALB 옆에 세우고 DNS 가중치만 90:10 → 50:50 → 0:100으로 옮겼다. 롤백은 같은 숫자를 되돌리는 것이다.
 - **한계** — 스냅샷은 일부 서비스만 담고 있고, 선언이 없어도 auto mTLS는 동작했을 수 있다. 서비스 간 mTLS 요구가 생기면 별도 설계가 필요하다. 실측 리소스 절감치는 없다.
 
@@ -86,13 +88,19 @@
 
 ## 4. GitOps 재설계
 
-`[기간]` · Terraform, Terramate, Argo CD, Helm, GitHub Actions
+2024.03 – 2026.03 · Terraform, Terramate, Argo CD, Helm, GitHub Actions
 
 - **문제** — Terraform 저장소와 manifest 저장소가 따로 있었다. Terraform Cloud는 비용이 추가됐고, 환경 브랜치 셋을 맞춰야 했으며, 환경이 workspace 이름 안에 숨어 코드만으로는 적용 대상을 알기 어려웠다.
 - **판단** — 인프라와 배포는 이름으로 이어져 있어, 저장소가 나뉘면 그 연결이 PR 두 개가 된다. 분리의 이점은 규모가 클 때 나온다. 하나로 합치고, 반복은 Terramate 생성 규칙으로 없앴다. 생성 결과가 native `.tf`라 새로 온 사람도 최종 코드를 직접 읽는다.
 - **결과** — 손으로 쓴 backend 선언 39개가 생성 규칙 1개(S3 backend stack 69개)로, `terraform_remote_state` 참조 59곳이 0으로 줄었다. CI 자격 증명은 IAM user key에서 GitHub OIDC로 바꿨다.
 
 ![입사 시점의 두 저장소와 현재의 모노레포](assets/portfolio/04-gitops.png)
+
+| 코드 저장소 | 비교할 내용 |
+|---|---|
+| [이전 인프라](https://github.com/b100to/infra-config-portfolio/tree/83a3c408fb7be3917c0f2efba3d137f54c0fa205) | infra-config-portfolio: Terraform·ECS·Terraform Cloud |
+| [이전 배포](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb) | manifest-k8s-cluster-portfolio: 서비스별 Helm chart·raw manifest |
+| [현재 모노레포](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec) | devops-configs-portfolio: 인프라·배포 설정을 한 저장소로 통합 |
 
 - **한계** — 공통 chart나 module의 작은 변경이 여러 소비자에게 전파된다. 권한은 아직 경로별로 나누지 않았다.
 
