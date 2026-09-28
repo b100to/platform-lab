@@ -226,16 +226,16 @@ def personalize(text, args):
 def verify(path):
     reader = PdfReader(path)
     texts = [page.extract_text() for page in reader.pages]
-    if len(texts) != 6:
-        raise ValueError(f"Expected six submission pages, got {len(texts)}; inspect layout")
-    starts = ["플랫폼 엔지니어링 포트폴리오", "1. 워크로드 분산", "핵심 발견", "2. Istio", "3. Authentik SSO", "4. GitOps 재설계"]
+    if len(texts) != 7:
+        raise ValueError(f"Expected seven submission pages, got {len(texts)}; inspect layout")
+    starts = ["플랫폼 엔지니어링 포트폴리오", "1. 워크로드 분산", "핵심 발견", "2. Istio", "3. Authentik SSO", "4. GitOps 재설계", "5. idle-reaper"]
     for index, expected in enumerate(starts):
         if expected not in texts[index]: raise ValueError(f"Expected {expected} on page {index + 1}")
     combined = "\n".join(texts)
     if any(value in combined for value in ("[이름]", "[이메일]", "[GitHub]", "[기간]", "\ufffd")):
         raise ValueError("Unfilled placeholder or replacement glyph in PDF")
     image_count = sum(len(page.images) for page in reader.pages)
-    if image_count != 5: raise ValueError(f"Expected five source images, got {image_count}")
+    if image_count != 6: raise ValueError(f"Expected six source images, got {image_count}")
     links = {"internal": 0, "external": 0}
     for page in reader.pages:
         for ref in page.get("/Annots", []):
@@ -255,7 +255,7 @@ def main():
     font_setup(args.font_path)
     setup_styles()
     parts = re.split(r"(?=^## )", personalize(SOURCE.read_text(), args), flags=re.M)
-    if len(parts) != 5: raise ValueError("Expected introduction and four cases in docs/portfolio.md")
+    if len(parts) != 6: raise ValueError("Expected introduction and five cases in docs/portfolio.md")
     story = [SectionMark("overview", "전체 작업"), Spacer(1, 12), para("DEVOPS / PLATFORM ENGINEERING", "eyebrow")]
     story.extend(markdown_flow(parts[0], cover=True))
     for index, section in enumerate(parts[1:], 1):
