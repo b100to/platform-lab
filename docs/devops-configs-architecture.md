@@ -4,9 +4,11 @@
 
 | 구분 | 저장소 | 담당 영역 | 기준 스냅샷 |
 |---|---|---|---|
-| 입사 시점 | [`infra-config-portfolio`](https://github.com/b100to/infra-config-portfolio) | Terraform — ECS·RDS·network, Terraform Cloud 실행 | [`83a3c40`](https://github.com/b100to/infra-config-portfolio/tree/83a3c408fb7be3917c0f2efba3d137f54c0fa205) |
-| 개편 전 | [`manifest-k8s-cluster-portfolio`](https://github.com/b100to/manifest-k8s-cluster-portfolio) | EKS 서비스별 Helm chart·raw manifest | [`ed4f0a3`](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb) |
-| 현재 | [`devops-configs-portfolio`](https://github.com/b100to/devops-configs-portfolio) | 인프라와 배포 선언을 묶은 모노레포 | [`7e3427a`](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec) |
+| 입사 시점 | [`infra-config-portfolio`](https://github.com/b100to/infra-config-portfolio) | Terraform — ECS·RDS·network, Terraform Cloud 실행 | [`a652184`](https://github.com/b100to/infra-config-portfolio/tree/a6521849c829b1e3c1b065412a01e880e3619ffe) |
+| 개편 전 | [`manifest-k8s-cluster-portfolio`](https://github.com/b100to/manifest-k8s-cluster-portfolio) | EKS 서비스별 Helm chart·raw manifest | [`8a4fb84`](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/8a4fb848b0cc93105f2451cbea6e749af296d187) |
+| 현재 | [`devops-configs-portfolio`](https://github.com/b100to/devops-configs-portfolio) | 인프라와 배포 선언을 묶은 모노레포 | [`7fd721d`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea) |
+
+코드 링크는 2026-09-28 확인한 공개용 스냅샷에 고정했으며, 예시의 익명화된 경로·이름도 해당 스냅샷을 따른다.
 
 ## 1. 두 갈래의 이전 저장소에서 GitOps 모노레포로
 
@@ -18,7 +20,7 @@ infra-config           Terraform · ECS · Terraform Cloud   ─┐
 manifest-k8s-cluster   서비스별 Helm · raw · Kustomize      ─┘
 ```
 
-입사 시점 저장소의 [`README.md`](https://github.com/b100to/infra-config-portfolio/blob/83a3c408fb7be3917c0f2efba3d137f54c0fa205/README.md)는 “현재는 terraform 코드만 있지만, 향후 Kubernetes와 관련된 선언형 설정 코드들이 이 저장소에 추가될 수 있습니다”라고 적고 있다. 현재 구조는 그 방향을 역할별 폴더로 구체화한 결과다.
+입사 시점 저장소의 [`README.md`](https://github.com/b100to/infra-config-portfolio/blob/a6521849c829b1e3c1b065412a01e880e3619ffe/README.md)는 “현재는 terraform 코드만 있지만, 향후 Kubernetes와 관련된 선언형 설정 코드들이 이 저장소에 추가될 수 있습니다”라고 적고 있다. 현재 구조는 그 방향을 역할별 폴더로 구체화한 결과다.
 
 ### 1-1. 인프라 쪽: 입사 시점의 Terraform 저장소
 
@@ -30,18 +32,18 @@ terraform/
 ├── security/{dev,prod}/
 ├── {dev,stage,prod}/common/     # <env>/common/<resource> 환경이 최상위
 │   └── alb/ ecr/ ecs/ s3/
-├── hospital/<service>/          # <product>/<service>     환경 디렉터리 없음
+├── partner/<service>/          # <product>/<service>     환경 디렉터리 없음
 ├── mall/{back,front}/
 └── modules/ecs/{single_task,multi_task,v2-ecs,rabbitmq}/
 ```
 
-세 번째 규칙에서는 환경이 경로에 없다. Terraform Cloud workspace 이름에서 환경을 뽑아내고, 환경별 값은 `locals`의 map으로 들고 있다. [`hospital/back-v2`](https://github.com/b100to/infra-config-portfolio/tree/83a3c408fb7be3917c0f2efba3d137f54c0fa205/terraform/hospital/back-v2)의 관련 필드 발췌:
+세 번째 규칙에서는 환경이 경로에 없다. Terraform Cloud workspace 이름에서 환경을 뽑아내고, 환경별 값은 `locals`의 map으로 들고 있다. [`partner/back-v2`](https://github.com/b100to/infra-config-portfolio/tree/a6521849c829b1e3c1b065412a01e880e3619ffe/terraform/partner/back-v2)의 관련 필드 발췌:
 
 ```hcl
 # version.tf
 backend "remote" {
   organization = "acme"
-  workspaces { prefix = "hospital-back-v2-" }
+  workspaces { prefix = "partner-back-v2-" }
 }
 
 # local.tf
@@ -54,14 +56,14 @@ remote_env = { dev = "dev", stage = "prod", prod = "prod" } # stage 전용 netwo
 
 | 관점 | 입사 시점 (`infra-config`) | 현재 (`devops-configs`) |
 |---|---|---|
-| 워크로드 런타임 | ECS Fargate. task definition과 컨테이너 command까지 Terraform이 소유 ([`backend.tf`](https://github.com/b100to/infra-config-portfolio/blob/83a3c408fb7be3917c0f2efba3d137f54c0fa205/terraform/dev/common/ecs/backend.tf)) | EKS. Terraform은 플랫폼까지, workload는 Helm values와 Argo CD |
+| 워크로드 런타임 | ECS Fargate. task definition과 컨테이너 command까지 Terraform이 소유 ([`backend.tf`](https://github.com/b100to/infra-config-portfolio/blob/a6521849c829b1e3c1b065412a01e880e3619ffe/terraform/dev/common/ecs/backend.tf)) | EKS. Terraform은 플랫폼까지, workload는 Helm values와 Argo CD |
 | 실행과 state | Terraform Cloud VCS-driven, workspace별 state | GitHub Actions + S3 backend, `--changed`로 대상 stack 선택 |
 | 브랜치 모델 | `dev`·`stage`·`prod` 환경 브랜치, push마다 Terraform Cloud 트리거 | `main` + feature 브랜치, 환경은 stack tag로 선택 |
-| backend 선언 | 디렉터리마다 직접 쓴 `backend "remote"` 39개 | [`imports/backend.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/imports/backend.tm.hcl) 생성 규칙 1개로 69개 stack의 S3 backend 관리 |
-| 버전 고정 | 디렉터리별 선언. Terraform 제약 5종, AWS provider 제약 7종(major 3·4 공존) | 루트 [`config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/config.tm.hcl)의 globals 한 곳 |
+| backend 선언 | 디렉터리마다 직접 쓴 `backend "remote"` 39개 | [`imports/backend.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/imports/backend.tm.hcl) 생성 규칙 1개로 69개 stack의 S3 backend 관리 |
+| 버전 고정 | 디렉터리별 선언. Terraform 제약 5종, AWS provider 제약 7종(major 3·4 공존) | 루트 [`config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/config.tm.hcl)의 globals 한 곳 |
 | 환경 차이 표현 | 디렉터리 복제 또는 `locals`의 환경 키 map. `network/dev/main.tf`와 `network/prod/main.tf`는 158줄 중 `Environment` 태그 1줄만 다름 | leaf에는 `stack.tm.hcl`·`tfvars.tm.hcl` 등 차이만 두고 나머지는 생성 |
 | stack 간 값 전달 | `terraform_remote_state` 59곳이 workspace 이름 문자열을 참조 | `input` 블록 86개가 stack ID를 참조. `terraform_remote_state`는 0 |
-| CI 자격 증명 | workspace 환경 변수에 IAM user access key ([`terraform.md`](https://github.com/b100to/infra-config-portfolio/blob/83a3c408fb7be3917c0f2efba3d137f54c0fa205/terraform/terraform.md)) | GitHub OIDC로 role assume ([`_bootstrap/oidc_aws_github`](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec/_bootstrap/oidc_aws_github)) |
+| CI 자격 증명 | workspace 환경 변수에 IAM user access key ([`terraform.md`](https://github.com/b100to/infra-config-portfolio/blob/a6521849c829b1e3c1b065412a01e880e3619ffe/terraform/terraform.md)) | GitHub OIDC로 role assume ([`_bootstrap/oidc_aws_github`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/_bootstrap/oidc_aws_github)) |
 
 수치는 두 스냅샷의 선언을 집계한 값이다. 입사 시점의 remote backend는 실험용 `terraform/test/`를 제외하면 39개, 포함하면 44개다. 현재 전체 75개 stack 중 69개에는 S3 backend, `_bootstrap` 4개에는 local backend가 있고, pod-identity-agent/kubecost의 dev·prd 2개에는 backend 파일이 없다. 3절의 경로 축, 4절의 생성 규칙과 값 공유는 각각 이 표의 행 하나에 대한 현재의 답이다.
 
@@ -69,7 +71,7 @@ remote_env = { dev = "dev", stage = "prod", prod = "prod" } # stage 전용 netwo
 
 개편 전에는 Kubernetes 배포 구성이 별도 저장소에 있었다. 현재 구조는 Terraform/Terramate 인프라, Argo CD Application, Helm chart와 values, raw manifest를 하나의 GitOps 모노레포 안에서 역할별로 재배치한다.
 
-이 변화는 Helm이나 Argo CD를 새로 도입한 것이 아니다. 이전 저장소의 [`acmemall-backend-v4/README.md`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/README.md)에도 Argo CD 기반 흐름이 명시되어 있고, 서비스별 Helm chart와 raw manifest·Kustomize 구성이 함께 존재한다. 개편의 중심은 도구 교체보다 저장소 경계와 공통화 단위를 다시 설계한 데 있다.
+이 변화는 Helm이나 Argo CD를 새로 도입한 것이 아니다. 이전 저장소의 [`acmemall-backend-v4/README.md`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/README.md)에도 Argo CD 기반 흐름이 명시되어 있고, 서비스별 Helm chart와 raw manifest·Kustomize 구성이 함께 존재한다. 개편의 중심은 도구 교체보다 저장소 경계와 공통화 단위를 다시 설계한 데 있다.
 
 | 관점 | 개편 전 | 현재 |
 |---|---|---|
@@ -95,9 +97,9 @@ acmemall-backend-v4/
     └── values/
 ```
 
-예를 들어 [`api/helmfile.yaml`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/api/helmfile.yaml)은 `./helm`과 `./values/{{.Environment.Name}}.yaml`을 연결한다. API와 API Admin은 각각 자신의 [`Chart.yaml`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/api/helm/Chart.yaml)과 template 디렉터리를 가진다.
+예를 들어 [`api/helmfile.yaml`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api/helmfile.yaml)은 `./helm`과 `./values/{{.Environment.Name}}.yaml`을 연결한다. API와 API Admin은 각각 자신의 [`Chart.yaml`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api/helm/Chart.yaml)과 template 디렉터리를 가진다.
 
-동시에 모든 서비스가 Helm으로 통일된 구조도 아니었다. [`acme-recommendation-api/dev/kustomization.yml`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acme-recommendation-api/dev/kustomization.yml)은 같은 환경 폴더의 Namespace, Deployment, Service를 Kustomize resource로 조합한다.
+동시에 모든 서비스가 Helm으로 통일된 구조도 아니었다. [`acme-recommendation-api/dev/kustomization.yml`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acme-recommendation-api/dev/kustomization.yml)은 같은 환경 폴더의 Namespace, Deployment, Service를 Kustomize resource로 조합한다.
 
 현재 구조는 서비스별 설정을 없애기보다 위치와 책임을 분리한다. 공통 workload 골격은 `charts/app`, 서비스·환경 차이는 `values/apps`, 배포 연결은 `argocd`, 클라우드 기반은 `stacks`와 `modules`가 맡는다. 이후 절에서는 이 현재 구조를 각 계층별로 설명한다.
 
@@ -118,11 +120,11 @@ stacks/acme/ecr/mall/dev/main.tf        "acmemall-backend-v4/dev/api"           
 values/apps/mall/v4/api/dev.yaml        repository: acmemall-backend-v4/dev/api    # 그 이미지를 배포
 ```
 
-[`ECR stack`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/ecr/mall/dev/main.tf)과 [`앱 values`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/values/apps/mall/v4/api/dev.yaml)가 한 저장소에 있으므로 한 번의 검색으로 양쪽이 나오고, 이름을 바꾸는 변경이 한 PR에 담긴다.
+[`ECR stack`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/ecr/mall/dev/main.tf)과 [`앱 values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/dev.yaml)가 한 저장소에 있으므로 한 번의 검색으로 양쪽이 나오고, 이름을 바꾸는 변경이 한 PR에 담긴다.
 
-두 번째 이유는 저장소에 흔적이 남아 있다. 루트의 [`AGENTS.md`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/AGENTS.md)는 “Terraform 적용 규칙”과 “ArgoCD/Helm 작업 규칙”을 한 파일에 담아, 인프라와 배포의 작업 규칙을 한곳에서 찾도록 한다.
+두 번째 이유는 저장소에 흔적이 남아 있다. 루트의 [`AGENTS.md`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/AGENTS.md)는 “Terraform 적용 규칙”과 “ArgoCD/Helm 작업 규칙”을 한 파일에 담아, 인프라와 배포의 작업 규칙을 한곳에서 찾도록 한다.
 
-반대급부는 권한과 변경 반경이 한 저장소로 모인다는 점이다. 실행 범위는 `--changed`와 환경 tag가 stack 단위로 좁힌다. 권한은 아직 좁히지 않았다. 이 스냅샷의 [`CODEOWNERS`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/.github/CODEOWNERS)는 단일 소유자 규칙 하나이고, 팀이 커지면 경로별 소유자로 나누는 것이 저장소를 다시 쪼개는 것보다 먼저 쓸 수단이다.
+반대급부는 권한과 변경 반경이 한 저장소로 모인다는 점이다. 실행 범위는 `--changed`와 환경 tag가 stack 단위로 좁힌다. 권한은 아직 좁히지 않았다. 이 스냅샷의 [`CODEOWNERS`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/.github/CODEOWNERS)는 단일 소유자 규칙 하나이고, 팀이 커지면 경로별 소유자로 나누는 것이 저장소를 다시 쪼개는 것보다 먼저 쓸 수단이다.
 
 ## 2. 저장소를 역할로 읽기
 
@@ -162,7 +164,7 @@ flowchart LR
   RAW --> K8S
 ```
 
-첫 번째 흐름은 Terraform이 클라우드·클러스터 기반과 일부 bootstrap 구성요소를 만든다. 두 번째 흐름은 Argo CD가 공통 차트, 외부 차트, raw manifest를 원하는 Kubernetes 리소스로 연결한다. 소스: [루트 구조](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec), [Terramate stacks](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks), [Argo CD 선언](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec/argocd)
+첫 번째 흐름은 Terraform이 클라우드·클러스터 기반과 일부 bootstrap 구성요소를 만든다. 두 번째 흐름은 Argo CD가 공통 차트, 외부 차트, raw manifest를 원하는 Kubernetes 리소스로 연결한다. 소스: [루트 구조](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea), [Terramate stacks](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks), [Argo CD 선언](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd)
 
 ## 3. 스택 경로가 표현하는 설계 축
 
@@ -185,13 +187,13 @@ stacks/acme/ecr/mall/prd
 | target / service group | 대상 클러스터나 서비스 묶음 | `main` | `mall` |
 | environment | 격리된 배포 환경 | `dev` | `prd` |
 
-입사 시점 저장소에서는 환경이 디렉터리, 최상위 폴더, workspace 이름 중 어디에 있는지가 stack마다 달랐다(1-1). 현재는 환경이 항상 leaf 디렉터리이고, 루트 [`config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/config.tm.hcl)의 `environment = terramate.stack.path.basename` 한 줄이 그 규칙을 정의한다.
+입사 시점 저장소에서는 환경이 디렉터리, 최상위 폴더, workspace 이름 중 어디에 있는지가 stack마다 달랐다(1-1). 현재는 환경이 항상 leaf 디렉터리이고, 루트 [`config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/config.tm.hcl)의 `environment = terramate.stack.path.basename` 한 줄이 그 규칙을 정의한다.
 
 경로 깊이는 고정 스키마가 아니다. 예를 들어 `outline/prd`처럼 서비스 자체가 중간 축이 되거나, 리소스 종류에 따라 target 축이 생략될 수 있다. 따라서 “끝에서 두 번째는 항상 서비스” 같은 위치 기반 규칙보다 각 상위 `config.tm.hcl`이 정의하는 global을 함께 읽어야 한다.
 
-EKS의 `main`은 버전 디렉터리가 아니다. [`stacks/acme/eks/main/config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/eks/main/config.tm.hcl)에서 `version = "v2"`를 별도 global로 정의한다. dev의 Kubernetes 버전 `1.35`도 [`tfvars.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/eks/main/dev/tfvars.tm.hcl)에 따로 있다. 즉 `main`, `v2`, `1.35`는 각각 논리적 대상, 클러스터 세대, Kubernetes 버전이라는 다른 관심사다.
+EKS의 `main`은 버전 디렉터리가 아니다. [`stacks/acme/eks/main/config.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/eks/main/config.tm.hcl)에서 `version = "v2"`를 별도 global로 정의한다. dev의 Kubernetes 버전 `1.35`도 [`tfvars.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/eks/main/dev/tfvars.tm.hcl)에 따로 있다. 즉 `main`, `v2`, `1.35`는 각각 논리적 대상, 클러스터 세대, Kubernetes 버전이라는 다른 관심사다.
 
-ECR은 같은 계층 규칙 안에서도 구현 선택이 다르다. [`stacks/acme/ecr/mall/prd/main.tf`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/ecr/mall/prd/main.tf)는 리포지터리와 lifecycle policy를 직접 작성한다. 모든 leaf stack이 공통 모듈에서 생성된다는 전제는 맞지 않는다.
+ECR은 같은 계층 규칙 안에서도 구현 선택이 다르다. [`stacks/acme/ecr/mall/prd/main.tf`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/ecr/mall/prd/main.tf)는 리포지터리와 lifecycle policy를 직접 작성한다. 모든 leaf stack이 공통 모듈에서 생성된다는 전제는 맞지 않는다.
 
 ## 4. Terramate 상속과 생성 경계
 
@@ -207,7 +209,7 @@ ECR은 같은 계층 규칙 안에서도 구현 선택이 다르다. [`stacks/ac
 
 환경 브랜치의 핵심 문제는 **환경 차이가 브랜치 간 diff로 표현된다**는 점이다. 브랜치가 어긋나면 그것이 의도한 환경 차이인지 아직 반영하지 않은 변경인지 구분할 수 없다. 현재 구조는 환경 차이를 한 브랜치 안의 디렉터리와 values 파일로 옮겨서, 어긋남이 생길 자리를 없앤다.
 
-환경 선택은 브랜치 대신 stack tag가 맡는다. [`deploy.yml`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/.github/workflows/deploy.yml)은 `main` push 하나로 시작해 `--tags=dev --changed`와 `--tags=prd --changed` job을 각각 돌리고, [`prewiew.yml`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/.github/workflows/prewiew.yml)은 PR에서 같은 선택 규칙으로 plan을 보여준다.
+환경 선택은 브랜치 대신 stack tag가 맡는다. [`deploy.yml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/.github/workflows/deploy.yml)은 `main` push 하나로 시작해 `--tags=dev --changed`와 `--tags=prd --changed` job을 각각 돌리고, [`prewiew.yml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/.github/workflows/prewiew.yml)은 PR에서 같은 선택 규칙으로 plan을 보여준다.
 
 ### Terragrunt 대신 Terramate를 선택한 이유
 
@@ -225,13 +227,13 @@ Terragrunt도 `include`, `dependency`, remote state 구성과 run queue를 제�
 | 변경 실행 | Git-aware `--changed`와 tags로 CI 대상 stack 선택 | dependency graph 기반 run queue로 unit 실행 조정 |
 | 운영 가시성 | Terramate Cloud에서 stack 상태와 drift·배포 이력을 조회 | 필요에 맞는 별도 플랫폼 또는 연동을 함께 선택 |
 
-[`modules/eks/main.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/modules/eks/main.tm.hcl)의 `generate_hcl`은 module 호출을 native `.tf`로 만들고, provider와 backend도 leaf에 생성한다. GitHub Actions의 [`deploy.yml`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/.github/workflows/deploy.yml)은 `--changed`와 환경 tag를 함께 사용해 plan/apply 대상을 고른다. 이 구조는 Terramate의 [code generation](https://terramate.io/docs/cli/code-generation/)과 [change detection](https://terramate.io/docs/cli/change-detection/)을 각각 코드 공통화와 배포 범위 계산에 사용한다.
+[`modules/eks/main.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/modules/eks/main.tm.hcl)의 `generate_hcl`은 module 호출을 native `.tf`로 만들고, provider와 backend도 leaf에 생성한다. GitHub Actions의 [`deploy.yml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/.github/workflows/deploy.yml)은 `--changed`와 환경 tag를 함께 사용해 plan/apply 대상을 고른다. 이 구조는 Terramate의 [code generation](https://terramate.io/docs/cli/code-generation/)과 [change detection](https://terramate.io/docs/cli/change-detection/)을 각각 코드 공통화와 배포 범위 계산에 사용한다.
 
 Terramate Cloud도 선택을 뒷받침했다. UI에서 등록된 stack 수와 상태를 한눈에 보고, stack별 drift 결과와 배포 이력을 확인할 수 있어 저장소가 커져도 운영 상태를 추적하기 쉽다. 현재 Community 플랜은 무료로 제공되지만, 2명·1,000개 리소스·30일 데이터 보존 범위라는 제한이 있다. 자세한 기능과 제한은 [Terramate Cloud stack 문서](https://terramate.io/docs/cloud/stacks/details), [drift 문서](https://terramate.io/docs/cloud/drift/), [공식 요금표](https://terramate.io/pricing/)를 기준으로 한다.
 
 선택 당시 지속적인 버전 업데이트와 빠른 제품 발전도 긍정적으로 평가했다. 이는 구조를 결정한 핵심 근거라기보다, 장기 운영에 사용할 도구라는 판단을 강화한 요소였다.
 
-[`EKS dev stack`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/eks/main/dev/stack.tm.hcl)은 `after`와 `input`으로 실행 순서와 VPC output 전달을 각각 선언한다. 다만 Terramate 공식 문서에서 [outputs sharing](https://terramate.io/docs/cli/orchestration/outputs-sharing)은 experimental 기능으로 표시되며, 이 저장소의 workflow도 `--enable-sharing`을 명시한다. 이 기능은 도구 버전과 실험 기능 상태를 함께 관리해야 한다.
+[`EKS dev stack`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/eks/main/dev/stack.tm.hcl)은 `after`와 `input`으로 실행 순서와 VPC output 전달을 각각 선언한다. 다만 Terramate 공식 문서에서 [outputs sharing](https://terramate.io/docs/cli/orchestration/outputs-sharing)은 experimental 기능으로 표시되며, 이 저장소의 workflow도 `--enable-sharing`을 명시한다. 이 기능은 도구 버전과 실험 기능 상태를 함께 관리해야 한다.
 
 Terramate 설정은 루트에서 leaf 방향으로 맥락을 좁힌다.
 
@@ -255,9 +257,9 @@ flowchart TD
 | Terraform `locals` | 생성된 Terraform 안에서 값을 조합 |
 | Terraform `variables` | module 입력 계약과 기본값 정의 |
 
-EKS target의 [`import.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/eks/main/import.tm.hcl)은 provider 생성 규칙과 `/modules/eks/*.tm.hcl`을 가져온다. ECR에는 [`imports.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/ecr/mall/imports.tm.hcl)처럼 복수형 파일명도 있다. 파일명 자체보다 Terramate의 `import` 블록이 무엇을 선택하는지가 핵심이다.
+EKS target의 [`import.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/eks/main/import.tm.hcl)은 provider 생성 규칙과 `/modules/eks/*.tm.hcl`을 가져온다. ECR에는 [`imports.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/ecr/mall/imports.tm.hcl)처럼 복수형 파일명도 있다. 파일명 자체보다 Terramate의 `import` 블록이 무엇을 선택하는지가 핵심이다.
 
-공통 EKS 모듈은 `generate_hcl`로 Terraform 파일을 만든다. [`modules/eks/main.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/modules/eks/main.tm.hcl)은 내부에서 `terraform-aws-modules/eks/aws`를 호출하고 허용할 버전 범위를 지정한다.
+공통 EKS 모듈은 `generate_hcl`로 Terraform 파일을 만든다. [`modules/eks/main.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/modules/eks/main.tm.hcl)은 내부에서 `terraform-aws-modules/eks/aws`를 호출하고 허용할 버전 범위를 지정한다.
 
 관련 필드 발췌:
 
@@ -276,7 +278,7 @@ generate_hcl "_terramate_generated_main.tf" {
 `_terramate_generated_*.tf`와 `_generated_*.tf`는 생성 결과물이다. 소유권은 원본 `.tm.hcl`에 있으므로, 동작을 바꿀 때 생성 파일을 직접 고치는 대신 생성 규칙을 수정하고 다시 생성하는 구조다.
 ### 실행 순서와 값 공유는 별개다
 
-[`EKS dev stack`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/eks/main/dev/stack.tm.hcl)은 두 관계를 함께 표현한다.
+[`EKS dev stack`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/eks/main/dev/stack.tm.hcl)은 두 관계를 함께 표현한다.
 
 관련 필드 발췌:
 
@@ -309,12 +311,12 @@ backend "s3" {
 }
 ```
 
-입사 시점 저장소에서는 stack마다 `backend "remote"` 블록과 workspace 이름을 직접 썼다(1-1). 현재는 [`imports/backend.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/imports/backend.tm.hcl) 하나가 `global.domain`·`global.environment`로 bucket을, `terramate.stack.id`로 key를 조합한다.
+입사 시점 저장소에서는 stack마다 `backend "remote"` 블록과 workspace 이름을 직접 썼다(1-1). 현재는 [`imports/backend.tm.hcl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/imports/backend.tm.hcl) 하나가 `global.domain`·`global.environment`로 bucket을, `terramate.stack.id`로 key를 조합한다.
 
-EKS key에 경로에 없는 `v2`가 포함되는 점이 중요하다. 이는 단순한 폴더 경로 복사가 아니라 stack identity로부터 backend 주소를 구성한다는 뜻이다. 실제 생성 결과는 [`_terramate_generated_backend.tf`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/stacks/acme/eks/main/dev/_terramate_generated_backend.tf)에서 확인할 수 있다.
+EKS key에 경로에 없는 `v2`가 포함되는 점이 중요하다. 이는 단순한 폴더 경로 복사가 아니라 stack identity로부터 backend 주소를 구성한다는 뜻이다. 실제 생성 결과는 [`_terramate_generated_backend.tf`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/eks/main/dev/_terramate_generated_backend.tf)에서 확인할 수 있다.
 ## 5. 애플리케이션 공통 Helm 차트
 
-[`charts/app`](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec/charts/app)는 여러 서비스가 Kubernetes workload 골격을 공유하기 위한 차트다.
+[`charts/app`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app)는 여러 서비스가 Kubernetes workload 골격을 공유하기 위한 차트다.
 
 공통화 대상은 templates와 helpers다. 각 앱의 values가 생성 여부와 필요한 설정을 제공하고 template이 생략 가능한 값의 fallback을 처리한다. 공통 차트가 필요한 이유는 여러 서비스에서 반복되던 Kubernetes template과 생성 규칙을 한곳에서 관리하기 위해서다.
 
@@ -339,7 +341,7 @@ values/apps/mall/v4/api/dev.yaml                      # 앱·환경 차이
 argocd/dev/apps/mall/v4-api.yaml                      # 둘을 연결
 ```
 
-개편 전 [`API chart`](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/api/helm)와 [`dev values`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/ed4f0a3891a8bc075ed54113d2fdaebf25f58fcb/acmemall-backend-v4/api/values/dev.yaml)는 서비스 디렉터리 안에 함께 있었다. 현재는 [`공통 app chart`](https://github.com/b100to/devops-configs-portfolio/tree/7e3427a3a422f103cc6e4bc12adf79147ddacbec/charts/app), [`mall v4 API dev values`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/values/apps/mall/v4/api/dev.yaml), [`Argo CD Application`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/argocd/dev/apps/mall/v4-api.yaml)으로 책임이 나뉜다.
+개편 전 [`API chart`](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api/helm)와 [`dev values`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api/values/dev.yaml)는 서비스 디렉터리 안에 함께 있었다. 현재는 [`공통 app chart`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app), [`mall v4 API dev values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/dev.yaml), [`Argo CD Application`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd/dev/apps/mall/v4-api.yaml)으로 책임이 나뉜다.
 
 | template | 생성 리소스 | 활성 조건 또는 역할 |
 |---|---|---|
@@ -352,7 +354,7 @@ argocd/dev/apps/mall/v4-api.yaml                      # 둘을 연결
 
 실제 template 목록에는 Namespace template이 없다. values의 `namespace.name`은 생성 리소스의 namespace를 지정하지만, 이것만으로 Namespace 객체를 생성한다고 해석하면 안 된다.
 
-[`_helpers.tpl`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/charts/app/templates/_helpers.tpl)은 이름과 selector label, 이미지 주소, 환경 변수, 볼륨, node selector·affinity·toleration·topology spread 같은 반복 로직을 중앙화한다. 각 template은 이 helper를 호출해 동일한 규칙을 사용한다.
+[`_helpers.tpl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app/templates/_helpers.tpl)은 이름과 selector label, 이미지 주소, 환경 변수, 볼륨, node selector·affinity·toleration·topology spread 같은 반복 로직을 중앙화한다. 각 template은 이 helper를 호출해 동일한 규칙을 사용한다.
 
 ### 공통 차트와 앱·환경 values의 결합
 
@@ -370,7 +372,7 @@ flowchart LR
   ENV --> RENDER
 ```
 
-[`mall-v4-api dev Application`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/argocd/dev/apps/mall/v4-api.yaml)은 다음 연결을 명시한다.
+[`mall-v4-api dev Application`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd/dev/apps/mall/v4-api.yaml)은 다음 연결을 명시한다.
 
 관련 필드 발췌:
 
@@ -409,7 +411,7 @@ autoscaling:
 
 ### dev와 prd가 같은 골격을 다르게 사용하는 방식
 
-[`dev values`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/values/apps/mall/v4/api/dev.yaml)와 [`prd values`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/values/apps/mall/v4/api/prd.yaml)는 같은 chart를 사용하지만 운영 파라미터가 다르다.
+[`dev values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/dev.yaml)와 [`prd values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/prd.yaml)는 같은 chart를 사용하지만 운영 파라미터가 다르다.
 
 | 항목 | dev | prd | template 효과 |
 |---|---|---|---|
@@ -422,7 +424,7 @@ autoscaling:
 | PDB | 기본 비활성 | `minAvailable: 1` | prd에 PDB 생성 |
 | scheduling | topology spread 비활성 | 명시적 분산 규칙 | Pod 배치 제약 변경 |
 
-[`deployment.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/charts/app/templates/deployment.yaml)은 autoscaling이 켜지면 `spec.replicas`를 아예 출력하지 않는다. [`hpa.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/charts/app/templates/hpa.yaml)이 min/max와 metric을 관리하고, Application은 Deployment의 `/spec/replicas` 차이를 무시한다. 이 세 설정이 함께 replica 소유권 충돌을 줄인다.
+[`deployment.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app/templates/deployment.yaml)은 autoscaling이 켜지면 `spec.replicas`를 아예 출력하지 않는다. [`hpa.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app/templates/hpa.yaml)이 min/max와 metric을 관리하고, Application은 Deployment의 `/spec/replicas` 차이를 무시한다. 이 세 설정이 함께 replica 소유권 충돌을 줄인다.
 
 표의 PDB와 scheduling 행이 왜 그렇게 설정되었는지는 [EKS 워크로드 분산 설계](eks-workload-availability.md)에서 따로 다룬다.
 
@@ -440,7 +442,7 @@ autoscaling:
 | Terraform Helm provider | Argo CD, Karpenter 등 bootstrap | GitOps 제어면을 시작하기 위한 설치 |
 | 공통 앱 chart + Argo CD | mall API | 서비스 workload 표준화 |
 
-[`Traefik dev Application`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/argocd/dev/infra/networking/traefik.yaml)은 외부 chart `38.0.0`과 저장소의 [`values/infra/traefik/dev.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7e3427a3a422f103cc6e4bc12adf79147ddacbec/values/infra/traefik/dev.yaml)을 multi-source로 묶고 `CreateNamespace=true`를 지정한다.
+[`Traefik dev Application`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd/dev/infra/networking/traefik.yaml)은 외부 chart `38.0.0`과 저장소의 [`values/infra/traefik/dev.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/infra/traefik/dev.yaml)을 multi-source로 묶고 `CreateNamespace=true`를 지정한다.
 
 관련 필드 발췌:
 
