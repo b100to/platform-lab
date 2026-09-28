@@ -2,14 +2,19 @@
 
 서비스 메시를 도입하는 글은 많고 걷어내는 글은 적다. 이 문서는 운영 중인 EKS 클러스터에서 Istio를 제거하고 Traefik으로 옮긴 판단과 과정을 설명한다. 핵심은 도구 교체가 아니라 **"우리가 실제로 쓰고 있는 기능이 무엇인가"를 센 것**이다.
 
-| 근거 | 대상 | 기준 |
-|---|---|---|
-| 전환 전 | [`manifest-k8s-cluster-portfolio`](https://github.com/b100to/manifest-k8s-cluster-portfolio) | commit [`8a4fb84`](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/8a4fb848b0cc93105f2451cbea6e749af296d187) |
-| 전환 후 | [`devops-configs-portfolio`](https://github.com/b100to/devops-configs-portfolio) | commit [`7fd721d`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea) |
+> 이 문서는 운영 사례 기록이다. 본문의 경로·설정 발췌와 수치는 현재 비공개인 원본 구성의 검토·집계 결과이며, 현재 운영 상태를 증명하지 않는다. 공개 예제는 설계 패턴을 익명화·단순화한 별도 구현이다. 예제의 파일·리소스 수를 원본 통계로 해석하지 않는다.
 
-두 스냅샷의 설정을 비교한 문서이며, 운영 클러스터의 현재 상태를 증명하지는 않는다. 전환 전 스냅샷은 일부 서비스만 담고 있다. 저장소 구조는 [GitOps 저장소 아키텍처와 공통화 설계](devops-configs-architecture.md)에서 다룬다.
+| 사례 역할 | 공개 예제 |
+|---|---|
+| 전환 전 경로 매칭·rewrite | [VirtualService 예제](https://github.com/b100to/platform-engineering-examples/blob/main/routing/before/virtualservice.yaml) |
+| 전환 후 라우팅 | [IngressRoute 예제](https://github.com/b100to/platform-engineering-examples/blob/main/routing/after/ingressroute.yaml) |
+| 재사용 설정 | [Middleware 예제](https://github.com/b100to/platform-engineering-examples/blob/main/routing/after/middleware.yaml) |
+| ALB와 Traefik 연결 | [ALB 연결 예제](https://github.com/b100to/platform-engineering-examples/blob/main/routing/after/alb-ingress.yaml) |
+| 전환·롤백 판단 | [DNS 가중치 전환 예제](https://github.com/b100to/platform-engineering-examples/blob/main/routing/dns-weights.md) |
 
-코드 링크는 2026-09-28 확인한 공개용 스냅샷에 고정했으며, 예시의 익명화된 경로·이름도 해당 스냅샷을 따른다.
+원본의 일부 서비스 설정을 비교한 기록이며, 공개 예제는 전체 서비스나 운영 전환 스크립트를 복제하지 않는다. [라우팅 예제 범위](https://github.com/b100to/platform-engineering-examples/blob/main/routing/README.md)를 함께 참고한다.
+
+저장소 구조는 [GitOps 아키텍처](devops-configs-architecture.md)에서 다룬다.
 
 ## 1. 문제: 메시 값을 내고 인그레스만 쓰고 있었다
 
@@ -36,7 +41,7 @@ Envoy 수준까지 익히는 일은 우선순위가 될 수 없었다. 플랫폼
 | `VirtualService` | 4 | 경로 매칭, rewrite, 목적지 지정 |
 | `DestinationRule`, `PeerAuthentication`, `AuthorizationPolicy`, `EnvoyFilter` 등 | 0 | 트래픽 정책, mTLS, 서비스 간 인가 |
 
-공개 스냅샷에서 확인되는 명시적 설정은 L7 인그레스 라우팅 중심이었다. [`VirtualService template`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api-admin/helm/templates/virtualservice.yaml)은 prefix를 매칭해 `/`로 rewrite하고 서비스로 보낸다. 다만 정책이 없어도 sidecar 간 [auto mTLS](https://istio.io/latest/docs/tasks/security/authentication/authn-policy/)는 동작할 수 있으므로, 일부 스냅샷의 리소스 수만으로 전체 메시 기능의 미사용을 단정할 수는 없다.
+비공개 원본 구성에서 확인되는 명시적 설정은 L7 인그레스 라우팅 중심이었다. `VirtualService template`은 prefix를 매칭해 `/`로 rewrite하고 서비스로 보낸다. 다만 정책이 없어도 sidecar 간 [auto mTLS](https://istio.io/latest/docs/tasks/security/authentication/authn-policy/)는 동작할 수 있으므로, 일부 스냅샷의 리소스 수만으로 전체 메시 기능의 미사용을 단정할 수는 없다.
 
 반대로 비용은 전부 내고 있었다.
 
@@ -44,7 +49,7 @@ Envoy 수준까지 익히는 일은 우선순위가 될 수 없었다. 플랫폼
 |---|---|
 | pod당 고정 오버헤드 | 주입 대상 namespace의 모든 pod에 proxy 컨테이너가 하나씩 붙음. 서비스가 한가해도 요청값은 그대로 |
 | 제어면 | `istiod`와 ingress gateway를 별도로 운영하고 업그레이드해야 함 |
-| 예외 처리 | 배치 Job은 sidecar가 끝나지 않아 완료되지 못하므로 [`sidecar.istio.io/inject: "false"`](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/batch/templates/cronjob.yaml)를 따로 달아야 했음 |
+| 예외 처리 | 배치 Job은 sidecar가 끝나지 않아 완료되지 못하므로 `sidecar.istio.io/inject: "false"`를 따로 달아야 했음 |
 | 인지 부하 | 위의 세 겹 |
 
 ## 2. 판단: 메시가 필요한 조건인가
@@ -52,7 +57,7 @@ Envoy 수준까지 익히는 일은 우선순위가 될 수 없었다. 플랫폼
 | 메시가 값을 하는 조건 | 이 환경 |
 |---|---|
 | 서비스 간 호출이 많고 그 그래프가 복잡함 | 서비스 20여 개. MSA 경계가 뚜렷하지 않고 대부분의 트래픽이 외부 → 서비스 방향 |
-| 서비스 간 mTLS와 인가를 정책으로 강제해야 함 | 공개 스냅샷에서 명시적 강제 정책은 확인되지 않음 |
+| 서비스 간 mTLS와 인가를 정책으로 강제해야 함 | 비공개 원본 구성에서 명시적 강제 정책은 확인되지 않음 |
 | 카나리·미러링 같은 세밀한 트래픽 제어를 일상적으로 씀 | 사용하지 않음 |
 | 메시를 전담할 사람이 있음 | 없음 |
 
@@ -101,7 +106,7 @@ flowchart LR
 | AWS 리소스 | AWS Load Balancer Controller + ExternalDNS | ALB, listener, ACM 인증서, health check, access log, DNS 레코드 | 도메인·인증서가 추가될 때 |
 | 애플리케이션 라우팅 | Traefik | host·path 매칭, prefix 제거, CORS, allowlist, rate limit | 서비스가 추가되거나 경로가 바뀔 때 |
 
-연결점은 [`Ingress` 하나](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd/alb.yaml)다. 관련 필드 발췌:
+연결점은 `Ingress` 하나다. 관련 필드 발췌:
 
 ```yaml
 kind: Ingress
@@ -122,7 +127,7 @@ spec:
 
 ALB는 규칙을 하나만 가진다. 서비스가 늘어도 AWS 쪽은 변하지 않고, 인증서를 바꿔도 라우팅은 건드리지 않는다. 두 종류의 변경이 서로의 리뷰와 장애 반경에 들어오지 않는다.
 
-계획 단계와 달라진 점이 하나 있다. [마이그레이션 계획](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/docs/runbooks/traefik-migration-plan.md)은 Terraform으로 만든 ALB가 NodePort로 Traefik에 붙는 구조였고, 최종 구조는 Load Balancer Controller가 관리하는 ALB가 pod IP를 직접 타깃으로 삼는다. 노드는 Karpenter가 수시로 교체하므로, 타깃이 노드가 아니라 pod을 따라가는 쪽이 타깃 그룹을 안정적으로 유지한다.
+계획 단계와 달라진 점이 하나 있다. 마이그레이션 계획은 Terraform으로 만든 ALB가 NodePort로 Traefik에 붙는 구조였고, 최종 구조는 Load Balancer Controller가 관리하는 ALB가 pod IP를 직접 타깃으로 삼는다. 노드는 Karpenter가 수시로 교체하므로, 타깃이 노드가 아니라 pod을 따라가는 쪽이 타깃 그룹을 안정적으로 유지한다.
 
 ## 5. 옮기기: VirtualService에서 IngressRoute로
 
@@ -146,7 +151,7 @@ spec:
       route: [{ destination: { host: <service>, port: { number: 80 } } }]
 ```
 
-전환 후, [`mall.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd/mall.yaml)의 관련 필드 발췌:
+전환 후, `mall.yaml`의 관련 필드 발췌:
 
 ```yaml
 kind: IngressRoute
@@ -161,7 +166,7 @@ spec:
       services:    [{ name: mall-v4-api, port: 80 }]
 ```
 
-위치도 옮겼다. 라우팅이 서비스 chart의 template에 흩어져 있을 때는 "이 호스트로 들어온 요청이 어디로 가는가"에 답하려면 chart 여러 개를 열어야 했다. 지금은 [`manifests/traefik/<env>/`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd) 아래 도메인별 파일에 모여 있다. 스냅샷 기준 `IngressRoute` 38개, `Middleware` 29개, prd 호스트 21개다.
+위치도 옮겼다. 라우팅이 서비스 chart의 template에 흩어져 있을 때는 "이 호스트로 들어온 요청이 어디로 가는가"에 답하려면 chart 여러 개를 열어야 했다. 지금은 `manifests/traefik/<env>/` 아래 도메인별 파일에 모여 있다. 원본 구성 집계 기준 `IngressRoute` 38개, `Middleware` 29개, prd 호스트 21개다.
 
 같은 경로를 두 곳에서 정의하지 않도록 규칙도 하나 두었다. Traefik이 라우팅하는 서비스는 Helm chart의 ingress를 끈다.
 
@@ -177,13 +182,13 @@ spec:
 | 5. 관찰 | 요청 수, 지연, 에러율을 Traefik 메트릭과 access log로 확인 | 〃 |
 | 6. Istio 제거 | 안정 기간 뒤 VirtualService·Gateway → ingress gateway → control plane 순으로 삭제 | (이 시점부터 롤백 계획 폐기) |
 
-핵심은 4단계다. 옛 경로와 새 경로가 **각자의 ALB로 동시에 살아 있고**, 전환은 DNS 가중치 숫자 하나다. 롤백도 같은 숫자를 되돌리는 것이라 새 경로에 문제가 있어도 옛 경로는 손대지 않은 채 그대로다. [`dns-weighted-migrate.sh`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/scripts/dns-weighted-migrate.sh)가 도메인별로 이 단계를 실행한다.
+핵심은 4단계다. 옛 경로와 새 경로가 **각자의 ALB로 동시에 살아 있고**, 전환은 DNS 가중치 숫자 하나다. 롤백도 같은 숫자를 되돌리는 것이라 새 경로에 문제가 있어도 옛 경로는 손대지 않은 채 그대로다. 원본의 `dns-weighted-migrate.sh`가 도메인별로 이 단계를 실행했다. 공개 예제는 이 스크립트 대신 [전환·롤백 판단 절차 예제](https://github.com/b100to/platform-engineering-examples/blob/main/routing/dns-weights.md)를 제공하며 DNS를 변경하지 않는다.
 
 제거 순서도 의도적이다. 의존하는 쪽부터 지운다. 라우팅 리소스, ingress gateway, 제어면 순이다. 제어면을 먼저 지우면 그것에 의존하는 컴포넌트가 설정을 받지 못한 채 남는 구간이 생긴다.
 
 ## 7. 진입점이 하나가 되었으므로
 
-모든 외부 트래픽이 Traefik을 지난다. 단일 장애점이 되지 않도록 [`prd values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/infra/traefik/prd.yaml)에 가용성 설정을 묶었다.
+모든 외부 트래픽이 Traefik을 지난다. 단일 장애점이 되지 않도록 `prd values`에 가용성 설정을 묶었다.
 
 | 설정 | 값 |
 |---|---|

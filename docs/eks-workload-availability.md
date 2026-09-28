@@ -2,14 +2,18 @@
 
 운영 EKS 클러스터에서 노드 한 대가 NotReady가 되자 서비스가 같이 흔들린 장애를 계기로, 워크로드 분산을 **배치·재배치·보호·노드 공급** 네 층으로 다시 설계한 내용을 설명한다.
 
-| 근거 | 대상 | 기준 |
-|---|---|---|
-| 설정 | [`devops-configs-portfolio`](https://github.com/b100to/devops-configs-portfolio) | commit [`7fd721d`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea) 정적 스냅샷 |
-| 재현 | 이 저장소의 kind 클러스터 (Kubernetes v1.35, 운영과 같은 minor) | [`scripts/topology-spread-repro.sh`](../scripts/topology-spread-repro.sh) |
+> 이 문서는 운영 사례 기록이다. 본문의 경로·설정 발췌와 수치는 현재 비공개인 원본 구성의 검토·집계 결과이며, 현재 운영 상태를 증명하지 않는다. 공개 예제는 설계 패턴을 익명화·단순화한 별도 구현이다. 예제의 파일·리소스 수를 원본 통계로 해석하지 않는다.
 
-스냅샷은 설정을, 재현은 스케줄러 동작을 보여준다. 운영 클러스터의 현재 상태를 증명하는 문서는 아니다. 저장소 구조 자체는 [GitOps 저장소 아키텍처와 공통화 설계](devops-configs-architecture.md)에서 다룬다.
+| 사례 역할 | 공개 예제 |
+|---|---|
+| 배치·자발적 중단 보호 | [워크로드 예제](https://github.com/b100to/platform-engineering-examples/blob/main/availability/workload.yaml) |
+| 복귀 뒤 재배치 | [Descheduler 예제](https://github.com/b100to/platform-engineering-examples/blob/main/availability/descheduler-values.yaml) |
+| AZ별 노드 공급 | [NodePool 예제](https://github.com/b100to/platform-engineering-examples/blob/main/availability/nodepools.yaml) |
+| 전제·검증 범위 | [가용성 예제 안내](https://github.com/b100to/platform-engineering-examples/blob/main/availability/README.md) |
 
-코드 링크는 2026-09-28 확인한 공개용 스냅샷에 고정했으며, 예시의 익명화된 경로·이름도 해당 스냅샷을 따른다.
+기존 kind 재현 기록은 [`scripts/topology-spread-repro.sh`](../scripts/topology-spread-repro.sh)(Kubernetes v1.35)를 참고한다. 재현은 스케줄러 동작을 보여주며 운영 클러스터의 가용성 검증을 대신하지 않는다.
+
+저장소 구조는 [GitOps 아키텍처](devops-configs-architecture.md)에서 다룬다.
 
 ## 1. 문제: 노드 한 대가 곧 서비스 한 개였다
 
@@ -30,7 +34,7 @@
 | `whenUnsatisfiable: ScheduleAnyway` | `maxSkew: 1`이 있어도 점수에만 반영. 압박을 받으면 한 노드에 전부 들어감 |
 | 재배치 수단 없음 | 노드 재기동 뒤 한 번 몰리면 그대로 고착 |
 
-공통 차트의 기본값이 바로 그 권고였다. [`_helpers.tpl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app/templates/_helpers.tpl)의 기본 제약은 zone과 hostname 모두 `ScheduleAnyway`로 렌더링된다.
+공통 차트의 기본값이 바로 그 권고였다. `_helpers.tpl`의 기본 제약은 zone과 hostname 모두 `ScheduleAnyway`로 렌더링된다.
 
 이 문제가 특히 아팠던 배경이 있다. 노드 수를 줄이려고 대형 인스턴스를 AZ당 1대씩 두는 구성이라, 노드 한 대가 곧 용량의 절반이다. 노드가 적을수록 분산은 선택이 아니라 전제가 된다.
 
@@ -54,7 +58,7 @@ flowchart LR
 
 ## 3. 배치: TopologySpreadConstraints
 
-운영 앱의 제약은 두 줄이다. [`mall v4 API prd values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/prd.yaml)의 관련 필드 발췌:
+운영 앱의 제약은 두 줄이다. `mall v4 API prd values`의 관련 필드 발췌:
 
 ```yaml
 topologySpreadConstraints:
@@ -84,7 +88,7 @@ hostname만 강제하고 zone은 권고로 둔 이유는 AZ당 적격 앱 노드
 
 ### 3-1. `Honor`가 없으면: 유령 도메인
 
-기본값 `Ignore`는 **pod이 갈 수 없는 taint 노드도 분산 도메인으로 센다.** 이 클러스터에는 batch·airflow 전용 NodePool이 taint를 달고 있다([`batch.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/karpenter/prd/batch.yaml)). 앱 pod 입장에서 그 노드들은 영원히 0개인 도메인이다.
+기본값 `Ignore`는 **pod이 갈 수 없는 taint 노드도 분산 도메인으로 센다.** 이 클러스터에는 batch·airflow 전용 NodePool이 taint를 달고 있다(`batch.yaml`). 앱 pod 입장에서 그 노드들은 영원히 0개인 도메인이다.
 
 ```text
 replica 3, 앱 노드 2대 + taint 노드 1대
@@ -139,7 +143,7 @@ TSC는 스케줄 시점에만 작동한다. 3-2의 재현을 이어가면 그 �
 | 노드가 빠진 동안 | 생존 노드에 2 |
 | 노드 복귀 뒤 | **여전히 2 : 0** — 아무도 옮기지 않음 |
 
-용량을 지킨 대가로 쏠림이 남는다. 처음 장애의 원인과 같은 상태다. 이것을 주기적으로 교정하는 것이 Descheduler다. [`descheduler prd values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/infra/descheduler/prd.yaml)의 관련 필드 발췌:
+용량을 지킨 대가로 쏠림이 남는다. 처음 장애의 원인과 같은 상태다. 이것을 주기적으로 교정하는 것이 Descheduler다. `descheduler prd values`의 관련 필드 발췌:
 
 ```yaml
 kind: CronJob
@@ -167,7 +171,7 @@ deschedulerPolicy:
 | namespace 한정 | 강제 분산을 적용한 앱 namespace만 |
 | 10분 주기 CronJob | 차트 기본값(2분)보다 느슨하게. 첫 배포는 보수적으로 |
 
-배포는 [`Argo CD Application`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd/prd/infra/ops/descheduler.yaml)이 upstream chart와 저장소의 values를 multi-source로 묶는다.
+배포는 `Argo CD Application`이 upstream chart와 저장소의 values를 multi-source로 묶는다.
 
 ## 5. 보호: PodDisruptionBudget
 
@@ -179,7 +183,7 @@ podDisruptionBudget:
   minAvailable: 1
 ```
 
-[`pdb.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app/templates/pdb.yaml) template은 기본 `enabled: false`다. 차트에 기능을 추가해도 기존 릴리스의 렌더링 결과는 바뀌지 않고, 서비스별로 켠다.
+`pdb.yaml` template은 기본 `enabled: false`다. 차트에 기능을 추가해도 기존 릴리스의 렌더링 결과는 바뀌지 않고, 서비스별로 켠다.
 
 같은 PDB가 Karpenter의 노드 교체(만료·consolidation)와 수동 drain에서도 작동한다. 반대로 노드 장애처럼 **비자발적** 중단에는 관여하지 못한다. 그쪽은 3절의 몫이다.
 
@@ -198,7 +202,7 @@ CPU 한도 검사는 eventual consistency이므로 일시 초과할 수 있고, 
 
 중단 예산은 NodePool별이므로 두 pool의 동시 중단을 막는 전역 제한이 아니다. 만료는 이 예산의 제어 대상이 아니며, 서로 다른 `expireAfter`도 동시 교체를 보장해 막지는 않는다. [Karpenter 중단 예산과 만료](https://karpenter.sh/docs/concepts/disruption/)
 
-[`nodepool.yaml.tmpl`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/manifests/karpenter/prd/nodepool.yaml.tmpl)의 관련 필드 발췌:
+`nodepool.yaml.tmpl`의 관련 필드 발췌:
 
 ```yaml
 spec:
@@ -218,7 +222,7 @@ spec:
       - nodes: "1"
 ```
 
-첫 번째 NodePool은 [공통 모듈](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/modules/manifests/karpenter/main.tm.hcl)이 생성하고, 두 번째는 [prd stack](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/manifests/karpenter/prd/nodepool_b.tf)에만 직접 작성되어 있다. dev에는 AZ 이중화가 필요 없기 때문이다. 공통 생성과 leaf 직접 작성을 섞는 방식은 아키텍처 문서 4절의 구조를 그대로 쓴다.
+첫 번째 NodePool은 공통 모듈이 생성하고, 두 번째는 prd stack에만 직접 작성되어 있다. dev에는 AZ 이중화가 필요 없기 때문이다. 공통 생성과 leaf 직접 작성을 섞는 방식은 아키텍처 문서 4절의 구조를 그대로 쓴다.
 
 ## 7. 장애 시나리오로 다시 읽기
 
@@ -237,6 +241,8 @@ spec:
 
 ## 8. 검증한 것
 
+다음은 원본 차트 렌더링과 당시 kind 재현 기록이다. 새 공개 예제의 실행 결과로 재표기하지 않는다.
+
 | 대상 | 방법 | 결과 |
 |---|---|---|
 | 차트 렌더링 | `helm template mall-v4-api charts/app -n mall -f values/apps/mall/v4/api/prd.yaml` | Deployment에 3절의 제약 두 줄, PDB `minAvailable: 1`, HPA 생성 |
@@ -249,9 +255,11 @@ spec:
 
 ## 9. 한계와 남은 과제
 
+아래는 원본 구성 검토 시점의 상태다. 공개 최소 chart는 원본 helper의 전체 동작이나 알려진 제약을 복제하지 않는다.
+
 | 항목 | 상태 |
 |---|---|
 | 차트 기본값 | 여전히 `ScheduleAnyway`. `values.yaml`의 `defaultTopologySpread.whenUnsatisfiable` 키는 helper가 읽지 않아 값을 바꿔도 렌더링이 변하지 않는다. 앱별 적용이 끝났으므로 helper를 이 키에 연결해 기본값을 승격하는 것이 다음 단계 |
-| 적용 범위 | 스냅샷 기준 prd 앱 values 23개 중 hostname 강제 10개, PDB 9개. 강제 분산을 쓰면서 `Honor`와 PDB가 빠진 앱이 1개 있다 |
+| 적용 범위 | 원본 구성 집계 기준 prd 앱 values 23개 중 hostname 강제 10개, PDB 9개. 강제 분산을 쓰면서 `Honor`와 PDB가 빠진 앱이 1개 있다 |
 | 생존 노드의 여유 | `Honor`는 장애 중 pod을 생존 노드에 모은다. 그 노드가 전체 부하를 받을 requests 여유가 없으면 처음 장애(메모리 포화)를 옮겨 놓는 셈이다. requests 산정이 이 설계의 전제 |
 | 대상 밖 | PV가 AZ에 묶인 StatefulSet, 단일 replica, DaemonSet, EKS managed addon |

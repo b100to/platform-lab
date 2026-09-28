@@ -145,7 +145,7 @@ half(24, "전환 전 · 서비스 메시", False)
 f.line(460, 24, 460, 238)
 half(472, "전환 후 · 인그레스", True)
 f.line(24, 250, W - 24, 250)
-f.text(24, 276, "공개 스냅샷의 명시적 Istio 선언", 13, 400, GRAY)
+f.text(24, 276, "원본 구성의 명시적 Istio 선언", 13, 400, GRAY)
 f.text(232, 276, "Gateway 4  ·  VirtualService 4  ·  mTLS · 인가 · 트래픽 정책 0", 14.5, 600, INK, maxw=640)
 f.save()
 

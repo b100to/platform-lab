@@ -2,13 +2,19 @@
 
 Kubernetes 위의 운영 도구와 AWS 접근을 하나의 IdP로 묶고, 그 IdP의 설정까지 Git으로 관리하게 만든 과정을 설명한다. 도구마다 지원하는 인증 방식이 달라서, 핵심은 "SSO를 붙였다"가 아니라 **붙이는 방식을 앱의 능력에 맞춰 고른 것**과 **IdP 설정을 코드로 둔 것**이다.
 
-| 근거 | 대상 | 기준 |
-|---|---|---|
-| 설정 | [`devops-configs-portfolio`](https://github.com/b100to/devops-configs-portfolio) | commit [`7fd721d`](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea) 정적 스냅샷 |
+> 이 문서는 운영 사례 기록이다. 본문의 경로·설정 발췌와 수치는 현재 비공개인 원본 구성의 검토·집계 결과이며, 현재 운영 상태를 증명하지 않는다. 공개 예제는 설계 패턴을 익명화·단순화한 별도 구현이다. 예제의 파일·리소스 수를 원본 통계로 해석하지 않는다.
 
-스냅샷의 설정을 읽은 문서이며, 운영 클러스터의 현재 상태를 증명하지는 않는다. 저장소 구조는 [GitOps 저장소 아키텍처와 공통화 설계](devops-configs-architecture.md)에서 다룬다.
+| 사례 역할 | 공개 예제 |
+|---|---|
+| 인증 설정 선언 | [Blueprint 예제](https://github.com/b100to/platform-engineering-examples/blob/main/sso/blueprint.yaml) |
+| 시크릿 값 참조 | [ExternalSecret 예제](https://github.com/b100to/platform-engineering-examples/blob/main/sso/external-secret.yaml) |
+| Blueprint·시크릿 마운트 | [Helm values 예제](https://github.com/b100to/platform-engineering-examples/blob/main/sso/helm-values.yaml) |
+| AWS 신뢰 조건 | [IAM 신뢰 정책 예제](https://github.com/b100to/platform-engineering-examples/blob/main/sso/aws-trust-policy.json) |
+| ID token을 STS로 교환 | [credential_process 예제](https://github.com/b100to/platform-engineering-examples/blob/main/sso/credential-process.py) |
 
-코드 링크는 2026-09-28 확인한 공개용 스냅샷에 고정했으며, 예시의 익명화된 경로·이름도 해당 스냅샷을 따른다.
+공개 CLI 예제는 **OIDC 클라이언트가 발급받은 ID token → STS** 연결만 다룬다. 본문 운영 구현의 PKCE 로그인·refresh token 갱신·캐시는 재구현하지 않는다. [SSO 예제 전제·제외 범위](https://github.com/b100to/platform-engineering-examples/blob/main/sso/README.md)를 함께 참고한다.
+
+저장소 구조는 [GitOps 아키텍처](devops-configs-architecture.md)에서 다룬다.
 
 ## 1. 문제: 도구 수만큼 계정이 있었다
 
@@ -52,17 +58,17 @@ flowchart LR
 
 | 경로 | 흐르는 것 | 저장소 위치 |
 |---|---|---|
-| 로그인 | 사용자의 인증 요청 | [`manifests/traefik/prd/infra.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd/infra.yaml) |
-| 설정 | 앱·provider·정책·그룹 선언 | [`manifests/authentik/prd/blueprints.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/authentik/prd/blueprints.yaml) |
-| 시크릿 | OAuth client secret | [`manifests/authentik/prd/external-secret.yaml`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/authentik/prd/external-secret.yaml) |
+| 로그인 | 사용자의 인증 요청 | `manifests/traefik/prd/infra.yaml` |
+| 설정 | 앱·provider·정책·그룹 선언 | `manifests/authentik/prd/blueprints.yaml` |
+| 시크릿 | OAuth client secret | `manifests/authentik/prd/external-secret.yaml` |
 
 설정은 Git에 있지만 시크릿은 Git에 없다. 이 둘을 잇는 방법이 4절이다.
 
 ## 4. IdP 설정을 코드로: Blueprint
 
-Blueprint들은 ConfigMap 하나에 담겨 Authentik pod에 마운트된다. [`authentik prd values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/infra/authentik/prd.yaml)가 그 ConfigMap을 지정하고, [`Argo CD Application`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd/prd/infra/security/authentik.yaml)이 동기화한다.
+Blueprint들은 ConfigMap 하나에 담겨 Authentik pod에 마운트된다. `authentik prd values`가 그 ConfigMap을 지정하고, `Argo CD Application`이 동기화한다.
 
-스냅샷 기준 규모:
+원본 구성 집계 기준 규모:
 
 | 항목 | 수 |
 |---|---|
@@ -89,7 +95,7 @@ Blueprint에는 client secret 자리에 환경 변수 참조만 적는다.
   remoteRef: { key: <cluster-secret>, property: <property> }
 ```
 
-ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, Blueprint의 `!Env`가 그 값을 읽는다. 앱 쪽 [`ExternalSecret`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/external-secrets/prd/es-kubecost-oauth2.yaml)도 Secrets Manager의 **같은 property**를 읽어 수동 복사에 따른 불일치를 줄였다. 갱신·pod 재시작 시점이 다르면 일시적으로 값이 다를 수 있다. 스냅샷에서 Blueprint의 `!Env` 변수 7개가 전부 ExternalSecret 키에 대응하는 것을 확인했다.
+ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, Blueprint의 `!Env`가 그 값을 읽는다. 앱 쪽 `ExternalSecret`도 Secrets Manager의 **같은 property**를 읽어 수동 복사에 따른 불일치를 줄였다. 갱신·pod 재시작 시점이 다르면 일시적으로 값이 다를 수 있다. 스냅샷에서 Blueprint의 `!Env` 변수 7개가 전부 ExternalSecret 키에 대응하는 것을 확인했다.
 
 ### 접근 모델도 선언이다
 
@@ -109,7 +115,7 @@ ExternalSecret이 만든 K8s Secret을 Authentik pod이 `envFrom`으로 받고, 
 | 앱의 능력 | 방식 | 대상 |
 |---|---|---|
 | OIDC 내장 | OIDC | Argo CD, Argo Workflows, 위키 |
-| OAuth는 되지만 discovery 미사용 | Generic OAuth — `auth_url`·`token_url`·`api_url`을 직접 지정 | Grafana ([`values`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/infra/monitoring/grafana/prd.yaml)) |
+| OAuth는 되지만 discovery 미사용 | Generic OAuth — `auth_url`·`token_url`·`api_url`을 직접 지정 | Grafana (`values`) |
 | 프레임워크 수준의 OAuth | Flask OAuth | Airflow |
 | 인증 기능 없음 | 앞단에 oauth2-proxy를 reverse proxy로 배치 | 비용 분석 도구 |
 | SAML SP | SAML | AWS 콘솔 |
@@ -135,7 +141,7 @@ CLI는 secret을 안전하게 보관하기 어려워 public client로 구성하�
                    비용 분석 도구
 ```
 
-[`IngressRoute`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd/infra.yaml)는 해당 호스트의 모든 트래픽을 proxy로 보낸다. 도구 자체에는 인증 설정이 없다.
+`IngressRoute`는 해당 호스트의 모든 트래픽을 proxy로 보낸다. 도구 자체에는 인증 설정이 없다.
 
 이 구성에서는 cookie secret을 `args`로 전달하던 중 재배포 뒤 로그인 루프를 겪었다. `OAUTH2_PROXY_COOKIE_SECRET` 같은 네이티브 환경 변수로 전달 방식을 통일해 해결했다. 이 관찰만으로 Kubernetes의 `$(VAR)` 치환 기능 자체가 불안정하다고 일반화하지는 않는다.
 
@@ -185,6 +191,8 @@ IngressRoute 하나 안에서 경로와 priority로 나눈다. 사람이 쓰는 
 
 ### CLI: `credential_process`로 투명하게
 
+아래 흐름은 **원본 운영 구현**이다. [공개 CLI 예제](https://github.com/b100to/platform-engineering-examples/blob/main/sso/credential-process.py)는 이미 발급된 ID token을 입력받아 STS 응답을 AWS CLI 형식으로 변환하는 구간만 구현한다. PKCE·refresh·캐시까지 구현한 예제로 읽으면 안 된다.
+
 ```text
 aws CLI ──credential_process──▶ aws-oidc.sh
                                    │ 1. STS 캐시 유효?          → 즉시 반환
@@ -195,13 +203,13 @@ aws CLI ──credential_process──▶ aws-oidc.sh
                               Authentik ──id_token──▶ AWS STS ──▶ 임시 자격 증명 (1h)
 ```
 
-[`aws-oidc.sh`](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/scripts/aws-oidc.sh)는 AWS CLI가 자격 증명이 필요할 때 호출하는 프로그램이다. 사용자는 하루에 한 번 브라우저 로그인을 하고, 그 뒤 12시간은 refresh token이 조용히 갱신한다. `aws`를 호출하는 다른 도구와 에이전트도 같은 프로필을 그대로 쓴다.
+`aws-oidc.sh`는 AWS CLI가 자격 증명이 필요할 때 호출하는 프로그램이다. 사용자는 하루에 한 번 브라우저 로그인을 하고, 그 뒤 12시간은 refresh token이 조용히 갱신한다. `aws`를 호출하는 다른 도구와 에이전트도 같은 프로필을 그대로 쓴다.
 
 콘솔용 SAML과 CLI용 OIDC를 나눈 이유는 이 구현에서의 갱신 방식이다. CLI는 refresh token으로 OIDC 토큰을 갱신하고 STS 자격 증명을 재발급하도록 설계해, 반복 호출 시 브라우저 재인증 빈도를 줄였다.
 
 ### IAM 쪽 신뢰 조건
 
-[`authentik-aws-oidc` 모듈](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/modules/iam/authentik-aws-oidc/main.tm.hcl)의 관련 필드 발췌:
+`authentik-aws-oidc` 모듈의 관련 필드 발췌:
 
 ```hcl
 Action    = "sts:AssumeRoleWithWebIdentity"
@@ -260,6 +268,8 @@ Blueprint 방식의 가장 큰 함정은 운영 중에 발견했다.
 | 사용자의 그룹 배정 | 사람에 대한 판단이라 의도적으로 수동 |
 
 ## 9. 결과
+
+아래 결과는 운영 사례의 변화이며, 공개 최소 예제에서 전체 앱 연동이나 자동 갱신을 검증했다는 뜻은 아니다.
 
 | 항목 | 이전 | 현재 |
 |---|---|---|

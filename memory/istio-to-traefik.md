@@ -2,8 +2,10 @@
 
 - 범위: 서비스 메시(Istio)를 제거하고 Traefik + AWS Load Balancer Controller 구조로 옮긴 판단, 설계, 무중단 전환 절차, 잃은 것.
 - 계기: 개발자는 디버깅·구조 파악·인수인계가 어려웠고, 엔지니어는 sidecar·Istio 설정·Envoy 까지 알아야 하는 부담이 컸다. 서비스 수가 많지 않고 MSA 경계도 뚜렷하지 않았으며 비용을 줄여야 하는 시기였다.
-- 핵심 근거: 공개 스냅샷의 명시적 Istio 설정은 `Gateway` 4 + `VirtualService` 4로 인그레스 중심이다. 정책 부재만으로 auto mTLS까지 미사용이었다고 단정하지 않는다. ALB도 URL rewrite·CORS 응답 헤더를 지원하므로 선택 이유는 CRD 재사용과 책임 분리로 설명한다. 상세 근거는 정본을 따른다.
+- 핵심 근거: 비공개 원본 구성의 명시적 Istio 설정은 `Gateway` 4 + `VirtualService` 4로 인그레스 중심이다. 정책 부재만으로 auto mTLS까지 미사용이었다고 단정하지 않는다. ALB도 URL rewrite·CORS 응답 헤더를 지원하므로 선택 이유는 CRD 재사용과 책임 분리로 설명한다. 상세 근거는 정본을 따른다.
 - Traefik 을 고른 이유: 표준이던 ingress-nginx 의 retirement 공지(2025-11-11, 2026-03 까지 best-effort) 직후였다. 나머지는 CRD 기반 설정. 이 동기는 사용자 증언이며 저장소에는 없다.
-- 기준: `b100to/manifest-k8s-cluster-portfolio` commit `8a4fb84…`, `b100to/devops-configs-portfolio` commit `7fd721d…` 의 정적 스냅샷.
+- 기준: 현재 비공개인 원본 구성의 검토 기록이다. 원본 SHA나 비공개 저장소 링크를 공개 근거로 노출하지 않는다.
 - 확인 못 한 것: 실측 리소스 절감치, 계획(Terraform ALB + NodePort)이 최종 구조(LB Controller + IP target)로 바뀐 동기. 문서에는 기술적 효과만 적었다.
 - 정본: [서비스 메시를 걷어내기](../docs/istio-to-traefik.md)
+
+- 공개 참조 전환: [platform-engineering-examples](https://github.com/b100to/platform-engineering-examples)의 최소 예제로 설계 패턴을 설명한다. 원본 구성 통계와 운영 성과는 사례 기록이며 예제 크기·실행 결과로 증명하지 않는다. 상세 문서의 상단 범위 안내를 정본으로 따른다.

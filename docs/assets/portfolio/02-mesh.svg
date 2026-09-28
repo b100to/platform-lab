@@ -46,6 +46,6 @@
 <text x="472" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">알아야 할 것</text>
 <text x="556" y="232" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#1F3A5F" text-anchor="start">Kubernetes → CRD 두 종류</text>
 <line x1="24" y1="250" x2="896" y2="250" stroke="#D1D5DB" stroke-width="1" stroke-linecap="round"/>
-<text x="24" y="276" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">공개 스냅샷의 명시적 Istio 선언</text>
+<text x="24" y="276" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="13" font-weight="400" fill="#6B7280" text-anchor="start">원본 구성의 명시적 Istio 선언</text>
 <text x="232" y="276" font-family="'Helvetica Neue','Apple SD Gothic Neo',sans-serif" font-size="14.5" font-weight="600" fill="#111827" text-anchor="start">Gateway 4  ·  VirtualService 4  ·  mTLS · 인가 · 트래픽 정책 0</text>
 </svg>

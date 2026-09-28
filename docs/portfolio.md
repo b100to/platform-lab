@@ -11,9 +11,9 @@
 | 3 | Authentik SSO | 2026 | 계정 하나로 운영 도구와 AWS까지. IdP 설정도 Git으로 | 앱 20 · provider 10 · 정책 바인딩 15를 YAML로 선언 |
 | 4 | GitOps 재설계 | 2024.03 – 2026.03 | 저장소 둘과 Terraform Cloud를 모노레포 하나로 | backend 선언 39 → 생성 규칙 1 |
 
-수치는 고정 commit의 코드 스냅샷에서 직접 세었거나 로컬 클러스터에서 재현한 값이다. 증명하지 못하는 부분은 각 절의 "한계"에 적었다.
+수치는 비공개 원본 구성의 집계와 당시 검증 기록을 따른다. 공개 코드는 설계 패턴을 단순화한 예제이며, 원본의 규모·운영 결과를 그대로 재현하는 구성은 아니다.
 
-**현재 구현 코드:** [devops-configs-portfolio](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea) - 인프라·배포 설정을 통합한 GitOps 모노레포.
+**공개 설계 예제:** [platform-engineering-examples](https://github.com/b100to/platform-engineering-examples) - 네 사례의 대표 설정과 전후 비교.
 
 ---
 
@@ -27,7 +27,7 @@
 
 ![장애 시나리오 다섯 단계](assets/portfolio/01-availability.png)
 
-**구현 코드:** [TSC·PDB](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/prd.yaml#L155-L186) · [Descheduler 정책](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/infra/descheduler/prd.yaml) · [AZ별 NodePool](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/stacks/acme/manifests/karpenter/prd)
+**설계 예제:** [TSC·PDB](https://github.com/b100to/platform-engineering-examples/blob/main/availability/workload.yaml) · [Descheduler 정책](https://github.com/b100to/platform-engineering-examples/blob/main/availability/descheduler-values.yaml) · [AZ별 NodePool](https://github.com/b100to/platform-engineering-examples/blob/main/availability/nodepools.yaml)
 
 **핵심 발견.** 분산을 강제하면서 `nodeTaintsPolicy`를 기본값으로 두면, 갈 수 없는 노드가 "0개짜리 도메인"으로 계산에 남는다. 죽은 노드도 마찬가지라서, 가용성을 위한 설정이 장애 중 복구를 막는다.
 
@@ -68,7 +68,7 @@
 
 [상세 설계·전환 절차](istio-to-traefik.md)
 
-**전후 코드:** [기존 VirtualService](https://github.com/b100to/manifest-k8s-cluster-portfolio/blob/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api-admin/helm/templates/virtualservice.yaml) → [현재 IngressRoute](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd/mall.yaml) · [ALB 연결](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/traefik/prd/alb.yaml) · [DNS 전환 스크립트](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/scripts/dns-weighted-migrate.sh)
+**전후 예제:** [VirtualService](https://github.com/b100to/platform-engineering-examples/blob/main/routing/before/virtualservice.yaml) → [IngressRoute](https://github.com/b100to/platform-engineering-examples/blob/main/routing/after/ingressroute.yaml) · [ALB 연결](https://github.com/b100to/platform-engineering-examples/blob/main/routing/after/alb-ingress.yaml) · [DNS 전환 절차](https://github.com/b100to/platform-engineering-examples/blob/main/routing/dns-weights.md)
 
 ---
 
@@ -88,7 +88,7 @@
 
 [상세 설계·겪은 함정](sso-authentik.md)
 
-**구현 코드:** [Blueprint 선언](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/authentik/prd/blueprints.yaml) · [시크릿 연동](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/manifests/authentik/prd/external-secret.yaml) · [AWS CLI 인증](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/scripts/aws-oidc.sh)
+**설계 예제:** [Blueprint 선언](https://github.com/b100to/platform-engineering-examples/blob/main/sso/blueprint.yaml) · [시크릿 연동](https://github.com/b100to/platform-engineering-examples/blob/main/sso/external-secret.yaml) · [ID token → STS 연결](https://github.com/b100to/platform-engineering-examples/blob/main/sso/credential-process.py). PKCE 로그인·갱신은 예제 범위 밖이다.
 
 ---
 
@@ -102,13 +102,13 @@
 
 ![입사 시점의 두 저장소와 현재의 모노레포](assets/portfolio/04-gitops.png)
 
-| 코드 저장소 | 비교할 내용 |
+| 공개 예제 | 비교할 내용 |
 |---|---|
-| [이전 인프라](https://github.com/b100to/infra-config-portfolio/tree/a6521849c829b1e3c1b065412a01e880e3619ffe) | infra-config-portfolio: [Terraform Cloud backend](https://github.com/b100to/infra-config-portfolio/blob/a6521849c829b1e3c1b065412a01e880e3619ffe/terraform/network/dev/versions.tf#L1-L11) |
-| [이전 배포](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/8a4fb848b0cc93105f2451cbea6e749af296d187) | manifest-k8s-cluster-portfolio: [서비스별 chart](https://github.com/b100to/manifest-k8s-cluster-portfolio/tree/8a4fb848b0cc93105f2451cbea6e749af296d187/acmemall-backend-v4/api/helm) |
-| [현재 모노레포](https://github.com/b100to/devops-configs-portfolio/tree/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea) | devops-configs-portfolio: [S3 backend 생성 규칙](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/imports/backend.tm.hcl#L15-L29) |
+| [이전 인프라](https://github.com/b100to/platform-engineering-examples/tree/main/gitops/before/terraform) | Terraform Cloud workspace 기반 backend |
+| [이전 배포](https://github.com/b100to/platform-engineering-examples/tree/main/gitops/before/helm/app) | 서비스별 chart에 배포 구조를 정의 |
+| [개편 후](https://github.com/b100to/platform-engineering-examples/tree/main/gitops/after) | [S3 backend 생성 규칙](https://github.com/b100to/platform-engineering-examples/blob/main/gitops/after/terramate/imports/backend.tm.hcl)과 공통 chart로 반복 분리 |
 
-**Helm 공통화:** [공통 chart](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/charts/app/templates/deployment.yaml) + [서비스·환경 values](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/values/apps/mall/v4/api/dev.yaml) → [Argo CD Application에서 연결](https://github.com/b100to/devops-configs-portfolio/blob/7fd721dba1fbc11a65a8ad5487730f2f63dd35ea/argocd/dev/apps/mall/v4-api.yaml#L14-L29).
+**Helm 공통화 예제:** [공통 chart](https://github.com/b100to/platform-engineering-examples/tree/main/gitops/after/helm/app) + [환경 values](https://github.com/b100to/platform-engineering-examples/blob/main/gitops/after/values/dev.yaml) → [Argo CD Application](https://github.com/b100to/platform-engineering-examples/blob/main/gitops/after/argocd/application.yaml).
 
 - **한계** — 공통 chart나 module의 작은 변경이 여러 소비자에게 전파된다. 권한은 아직 경로별로 나누지 않았다.
 
